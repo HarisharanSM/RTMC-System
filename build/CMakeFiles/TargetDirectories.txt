@@ -1,3 +1,0 @@
-/workspaces/RTMC-System/build/CMakeFiles/pcan_demo.dir
-/workspaces/RTMC-System/build/CMakeFiles/edit_cache.dir
-/workspaces/RTMC-System/build/CMakeFiles/rebuild_cache.dir

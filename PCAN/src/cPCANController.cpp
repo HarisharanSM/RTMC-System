@@ -1,8 +1,8 @@
-#include "../include/cPCANController.h" 
+#include "../include/cPCANController.h"
 #include <iostream>
 
 cPCANController::cPCANController(TPCANHandle channel, DWORD baudRate)
-    : m_Channel(channel), m_BaudRate(baudRate), m_IsRunning(false) {
+    : m_Channel(channel), m_BaudRate(baudRate), m_IsRunning(false), m_StoredCallback(nullptr) {
     m_Sender = std::make_unique<cPCANSender>(m_Channel);
     m_Receiver = std::make_unique<cPCANReceiver>(m_Channel);
 }
@@ -13,6 +13,8 @@ cPCANController::~cPCANController() {
 
 bool cPCANController::Start(MessageCallback callback) {
     if (m_IsRunning) return true;
+    m_StoredCallback = callback; // Save reference for loopback matching
+
     if (!m_Sender->Initialize(m_BaudRate)) return false;
     if (!m_Receiver->Start(callback, m_BaudRate)) {
         m_Sender->Uninitialize();
@@ -27,9 +29,17 @@ void cPCANController::Stop() {
     m_Receiver->Stop();
     m_Sender->Uninitialize();
     m_IsRunning = false;
+    m_StoredCallback = nullptr;
 }
 
 bool cPCANController::SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, const BYTE* data) {
     if (!m_IsRunning) return false;
     return m_Sender->SendMessage(id, msgType, len, data);
+}
+
+// Re-add implementation to bridge the mocker tool natively
+void cPCANController::InjectReceivedMessage(const TPCANMsg& msg) {
+    if (m_IsRunning && m_StoredCallback) {
+        m_StoredCallback(msg);
+    }
 }

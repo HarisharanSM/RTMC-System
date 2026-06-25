@@ -34,40 +34,14 @@ void cPCANReceiver::Stop() {
 }
 
 void cPCANReceiver::ReceiveLoop() {
+    // Keep the thread alive, but strip out the automatic dummy message generator
     while (m_Running) {
-        TPCANMsg receivedMsg;
-        bool messageAvailable = false;
-
-        /* Production Implementation:
-        DWORD result = CAN_Read(m_Channel, &receivedMsg, NULL);
-        if (result == PCAN_ERROR_OK) {
-            messageAvailable = true;
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        
+        /* On production hardware, real frames from physical controllers 
+           would be captured here via CAN_Read() and sent to m_Callback.
+           For our cloud setup, we leave this empty so only our UI Mocker 
+           triggers data prints.
         */
-
-        // Simple Mock Simulation for codespaces environment loop
-        std::this_thread::sleep_for(std::chrono::milliseconds(800)); 
-        static DWORD mockCounter = 0;
-        
-        receivedMsg.ID = 0x100 + (mockCounter % 3);
-        receivedMsg.LEN = 4;
-        receivedMsg.DATA[0] = 0xAA; // e.g., Axis ID
-        receivedMsg.DATA[1] = 0x02; // e.g., Target Velocity Command
-        receivedMsg.DATA[2] = 0x00;
-        receivedMsg.DATA[3] = (BYTE)(mockCounter & 0xFF);
-        
-        // Dynamically rotate message type statuses for testing requirements
-        if (mockCounter % 4 == 0) receivedMsg.MSGTYPE = PCAN_MESSAGE_STANDARD;
-        else if (mockCounter % 4 == 1) receivedMsg.MSGTYPE = PCAN_MESSAGE_STATUS;
-        else if (mockCounter % 4 == 2) receivedMsg.MSGTYPE = PCAN_MESSAGE_ERRFRAME;
-        else receivedMsg.MSGTYPE = PCAN_MESSAGE_ECHO;
-
-        messageAvailable = true;
-        mockCounter++;
-
-        // Pass message via application callback if received successfully
-        if (messageAvailable && m_Callback) {
-            m_Callback(receivedMsg);
-        }
     }
 }

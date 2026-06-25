@@ -12,7 +12,6 @@ bool cControlManager::InitializeSystem() {
     std::cout << "[cControlManager] Initializing Main Motion Loop via Interface...\n";
     if (!m_PcanController) return false;
 
-    // Direct binding of internal worker logic to PCAN pipeline stream
     return m_PcanController->Start([this](const TPCANMsg& msg) { 
         this->OnCanFrameIntercepted(msg); 
     });
@@ -26,19 +25,13 @@ void cControlManager::ShutdownSystem() {
 }
 
 void cControlManager::ProcessUiCommand(int axisId, double velocity) {
-    std::cout << "[cControlManager] Translating High-level UI Input to CAN Payload...\n";
-    
-    BYTE payload[8] = {0};
-    payload[0] = static_cast<BYTE>(axisId);
-    // Dummy compression format mapping velocity data onto primitive byte structures
-    payload[1] = (static_cast<int>(velocity) >> 8) & 0xFF; 
-    payload[2] = static_cast<int>(velocity) & 0xFF;
-
-    // Execute via interface virtual table safely
+    std::cout << "[cControlManager] Sending Standard Command Frame...\n";
+    BYTE payload[3] = { static_cast<BYTE>(axisId), 0x00, 0x00 };
     m_PcanController->SendMessage(0x200, PCAN_MESSAGE_STANDARD, 3, payload);
 }
 
 void cControlManager::OnCanFrameIntercepted(const TPCANMsg& msg) {
-    std::cout << "[cControlManager Callback] Incoming Driver State Checked. ID: 0x" 
-              << std::hex << msg.ID << " | Frame Type: " << (int)msg.MSGTYPE << "\n";
+    std::cout << "[cControlManager Callback] Packet Received! ID: 0x" 
+              << std::hex << msg.ID << " | Type: " << (int)msg.MSGTYPE 
+              << " | Data[0]: 0x" << (int)msg.DATA[0] << "\n";
 }

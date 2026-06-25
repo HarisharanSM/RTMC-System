@@ -1,5 +1,5 @@
 #pragma once
-#include "iPCANController.h"
+#include "../../includes/iPCANController.h"
 #include "cPCANSender.h"
 #include "cPCANReceiver.h"
 #include <memory>
@@ -11,6 +11,9 @@ private:
     std::unique_ptr<cPCANSender> m_Sender;
     std::unique_ptr<cPCANReceiver> m_Receiver;
     bool m_IsRunning;
+    
+    // Stored callback reference to forward injected frames
+    MessageCallback m_StoredCallback;
 
 public:
     cPCANController(TPCANHandle channel = PCAN_USBBUS1, DWORD baudRate = PCAN_BAUD_500K);
@@ -19,7 +22,9 @@ public:
     bool Start(MessageCallback callback) override;
     void Stop() override;
     
-    // Implements API to forward payloads straight to cPCANSender
     bool SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, const BYTE* data) override;
     bool IsRunning() const override { return m_IsRunning; }
+
+    // Re-add this method for the Mocker layer!
+    void InjectReceivedMessage(const TPCANMsg& msg);
 };

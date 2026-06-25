@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTMC Dual-Joystick Console</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .wrapper-left { margin-left: 40px; }
+        .wrapper-right { margin-right: 40px; }
+
+        .container-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .left-title { color: #00adb5; }
+        .right-title { color: #ff5722; }
+
+        .control-container {
+            width: 220px;
+            height: 220px;
+            background-color: #1e1e1e;
+            border: 2px solid #333;
+            border-radius: 12px;
+            display: grid;
+            grid-template-areas: 
+                ".    up    ."
+                "left  .    right"
+                ".    down  .";
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        .left-pad { border-color: #00adb5; }
+        .right-pad { border-color: #ff5722; }
+
+        .btn {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.1s ease;
+            user-select: none;
+        }
+
+        .btn:hover { background-color: #3d3d3d; }
+        .btn:active { background-color: #00adb5; transform: scale(0.95); }
+        .right-pad .btn:active { background-color: #ff5722; }
+
+        .up { grid-area: up; }
+        .down { grid-area: down; }
+        .left { grid-area: left; }
+        .right { grid-area: right; }
+
+        .center-status {
+            text-align: center;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper wrapper-left">
+        <div class="container-title left-title">LAO/RAO, CRAN/CAUD</div>
+        <div class="control-container left-pad">
+            <button class="btn up" onclick="handleClick('L-up')">▲</button>
+            <button class="btn left" onclick="handleClick('L-left')">◀</button>
+            <button class="btn right" onclick="handleClick('L-right')">▶</button>
+            <button class="btn down" onclick="handleClick('L-down')">▼</button>
+        </div>
+    </div>
+
+    <div class="center-status">
+        <h2>RTMC INTERFACE</h2>
+        <div style="color: #00adb5; font-size: 0.9rem;">● LINK READY</div>
+    </div>
+
+    <div class="wrapper wrapper-right">
+        <div class="container-title right-title">X, Y</div>
+        <div class="control-container right-pad">
+            <button class="btn up" onclick="handleClick('R-up')">▲</button>
+            <button class="btn left" onclick="handleClick('R-left')">◀</button>
+            <button class="btn right" onclick="handleClick('R-right')">▶</button>
+            <button class="btn down" onclick="handleClick('R-down')">▼</button>
+        </div>
+    </div>
+
+    <script>
+        // Open a persistent websocket pipe to our C++ background node on port 8082
+        const ws = new WebSocket('ws://127.0.0.1:8082');
+
+        ws.onopen = () => console.log("WebSocket Link to cCANMocker Ready.");
+        ws.onerror = (err) => console.log("Waiting for C++ process to start...");
+
+        function handleClick(buttonId) {
+            console.log(`UI Event Triggered: ${buttonId}`);
+
+            // 1. Grab your active cloud workspace base URL
+            const currentUrl = window.location.href;
+
+            // 2. Dynamically replace port 8000 with port 8082
+            const backendUrl = currentUrl.replace("-8000.", "-8082.").split('?')[0];
+
+            // 3. Append the event query payload
+            const targetAddress = `${backendUrl}?btn=${buttonId}`;
+            console.log(`Routing directly to Cloud Mocker: ${targetAddress}`);
+
+            // 4. Fire the cross-origin request over HTTPS proxy rules
+            fetch(targetAddress, {
+                method: 'GET',
+                mode: 'no-cors' // Bypasses cross-origin domain checks safely
+            }).catch(err => console.log("Transmission pushed."));
+        }
+    </script>
+</body>
+</html>

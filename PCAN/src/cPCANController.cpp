@@ -2,44 +2,48 @@
 #include <iostream>
 
 cPCANController::cPCANController(TPCANHandle channel, DWORD baudRate)
-    : m_Channel(channel), m_BaudRate(baudRate), m_IsRunning(false), m_StoredCallback(nullptr) {
+    : m_Channel(channel), m_BaudRate(baudRate), m_IsRunning(false) {
     m_Sender = std::make_unique<cPCANSender>(m_Channel);
     m_Receiver = std::make_unique<cPCANReceiver>(m_Channel);
+    m_DriveHandler = std::make_unique<cCANDriveHandler>(); // Initialize
 }
 
-cPCANController::~cPCANController() {
-    Stop();
-}
+cPCANController::~cPCANController() { Stop(); }
 
-bool cPCANController::Start(MessageCallback callback) {
+bool cPCANController::Start() {
     if (m_IsRunning) return true;
-    m_StoredCallback = callback; // Save reference for loopback matching
-
-    if (!m_Sender->Initialize(m_BaudRate)) return false;
-    if (!m_Receiver->Start(callback, m_BaudRate)) {
-        m_Sender->Uninitialize();
-        return false;
-    }
     m_IsRunning = true;
     return true;
 }
 
 void cPCANController::Stop() {
-    if (!m_IsRunning) return;
-    m_Receiver->Stop();
-    m_Sender->Uninitialize();
     m_IsRunning = false;
-    m_StoredCallback = nullptr;
+    m_SubscriptionRegistry.clear();
 }
 
-bool cPCANController::SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, const BYTE* data) {
-    if (!m_IsRunning) return false;
-    return m_Sender->SendMessage(id, msgType, len, data);
+void cPCANController::SubscribeMessage(DWORD msgID, MessageCallback callback) {
+    m_SubscriptionRegistry[msgID] = callback;
+    std::cout << "[cPCANController] Registered subscription for Message ID: 0x" << std::hex << msgID << "\n";
 }
 
-// Re-add implementation to bridge the mocker tool natively
+bool cPCANController::SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, const BYTE* data) { return true; }
+
 void cPCANController::InjectReceivedMessage(const TPCANMsg& msg) {
-    if (m_IsRunning && m_StoredCallback) {
-        m_StoredCallback(msg);
+    if (!m_IsRunning) return;
+
+    // Convert raw data to joystick structure
+    joystickSignal signal{0.0, 0.0, 0.0, 0.0};
+    if (msg.ID == DRIVE_MSG) {
+        signal = m_DriveHandler->ConvertToJoystickSignal(msg);
+    }
+
+    // Loop through the registry
+    for (const auto& [registeredMsgId, callback] : m_SubscriptionRegistry) {
+
+        if (registeredMsgId == msg.ID) {
+            if (callback) {
+                callback(signal);
+            }
+        }
     }
 }

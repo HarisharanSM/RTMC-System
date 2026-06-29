@@ -96,53 +96,61 @@
     <div class="wrapper wrapper-left">
         <div class="container-title left-title">LAO/RAO, CRAN/CAUD</div>
         <div class="control-container left-pad">
-            <button class="btn up" onclick="handleClick('L-up')">▲</button>
-            <button class="btn left" onclick="handleClick('L-left')">◀</button>
-            <button class="btn right" onclick="handleClick('L-right')">▶</button>
-            <button class="btn down" onclick="handleClick('L-down')">▼</button>
+            <button class="btn up" onmousedown="startHold('L-up')" onmouseup="stopHold()" onmouseleave="stopHold()">▲</button>
+            <button class="btn left" onmousedown="startHold('L-left')" onmouseup="stopHold()" onmouseleave="stopHold()">◀</button>
+            <button class="btn right" onmousedown="startHold('L-right')" onmouseup="stopHold()" onmouseleave="stopHold()">▶</button>
+            <button class="btn down" onmousedown="startHold('L-down')" onmouseup="stopHold()" onmouseleave="stopHold()">▼</button>
         </div>
     </div>
 
     <div class="center-status">
         <h2>RTMC INTERFACE</h2>
-        <div style="color: #00adb5; font-size: 0.9rem;">● LINK READY</div>
+        <div style="color: #00adb5; font-size: 0.9rem;">● STREAM ACTIVE</div>
     </div>
 
     <div class="wrapper wrapper-right">
         <div class="container-title right-title">X, Y</div>
         <div class="control-container right-pad">
-            <button class="btn up" onclick="handleClick('R-up')">▲</button>
-            <button class="btn left" onclick="handleClick('R-left')">◀</button>
-            <button class="btn right" onclick="handleClick('R-right')">▶</button>
-            <button class="btn down" onclick="handleClick('R-down')">▼</button>
+            <button class="btn up" onmousedown="startHold('R-up')" onmouseup="stopHold()" onmouseleave="stopHold()">▲</button>
+            <button class="btn left" onmousedown="startHold('R-left')" onmouseup="stopHold()" onmouseleave="stopHold()">◀</button>
+            <button class="btn right" onmousedown="startHold('R-right')" onmouseup="stopHold()" onmouseleave="stopHold()">▶</button>
+            <button class="btn down" onmousedown="startHold('R-down')" onmouseup="stopHold()" onmouseleave="stopHold()">▼</button>
         </div>
     </div>
 
     <script>
-        // Open a persistent websocket pipe to our C++ background node on port 8082
-        const ws = new WebSocket('ws://127.0.0.1:8082');
+        let holdInterval = null;
 
-        ws.onopen = () => console.log("WebSocket Link to cCANMocker Ready.");
-        ws.onerror = (err) => console.log("Waiting for C++ process to start...");
-
-        function handleClick(buttonId) {
-            console.log(`UI Event Triggered: ${buttonId}`);
-
-            // 1. Grab your active cloud workspace base URL
+        function transmitSignal(buttonId) {
             const currentUrl = window.location.href;
-
-            // 2. Dynamically replace port 8000 with port 8082
             const backendUrl = currentUrl.replace("-8000.", "-8082.").split('?')[0];
-
-            // 3. Append the event query payload
             const targetAddress = `${backendUrl}?btn=${buttonId}`;
-            console.log(`Routing directly to Cloud Mocker: ${targetAddress}`);
 
-            // 4. Fire the cross-origin request over HTTPS proxy rules
             fetch(targetAddress, {
                 method: 'GET',
-                mode: 'no-cors' // Bypasses cross-origin domain checks safely
-            }).catch(err => console.log("Transmission pushed."));
+                mode: 'no-cors'
+            }).catch(err => console.log("Stream error omitted."));
+        }
+
+        // Called immediately on pointer down
+        function startHold(buttonId) {
+            if (holdInterval !== null) return; // Prevent duplicate timers
+
+            // 1. Fire the initial single press immediately
+            transmitSignal(buttonId);
+
+            // 2. Set up the repeating loop every 50ms for press-and-hold
+            holdInterval = setInterval(() => {
+                transmitSignal(buttonId);
+            }, 50);
+        }
+
+        // Called on pointer up or when mouse leaves the button boundaries
+        function stopHold() {
+            if (holdInterval !== null) {
+                clearInterval(holdInterval);
+                holdInterval = null;
+            }
         }
     </script>
 </body>

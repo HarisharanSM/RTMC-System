@@ -34,16 +34,9 @@ void cCANMocker::Stop() {
 }
 
 void cCANMocker::MockingLoop() {
-    // Exact requested sequential bit configurations (Bit positions 0 through 7)
     std::map<std::string, int> bitShiftMap = {
-        {"R-up",    0}, // Bit 0 -> 1 << 0 = 0x01
-        {"R-down",  1}, // Bit 1 -> 1 << 1 = 0x02
-        {"R-left",  2}, // Bit 2 -> 1 << 2 = 0x04
-        {"R-right", 3}, // Bit 3 -> 1 << 3 = 0x08
-        {"L-up",    4}, // Bit 4 -> 1 << 4 = 0x10
-        {"L-down",  5}, // Bit 5 -> 1 << 5 = 0x20
-        {"L-left",  6}, // Bit 6 -> 1 << 6 = 0x40
-        {"L-right", 7}  // Bit 7 -> 1 << 7 = 0x80
+        {"R-up",    0}, {"R-down",  1}, {"R-left",  2}, {"R-right", 3},
+        {"L-up",    4}, {"L-down",  5}, {"L-left",  6}, {"L-right", 7}
     };
 
     int serverFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -55,7 +48,10 @@ void cCANMocker::MockingLoop() {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(8082);
 
-    bind(serverFd, (struct sockaddr*)&address, sizeof(address));
+    if (bind(serverFd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+        std::cerr << "[cCANMocker] Socket bind failed!\n";
+        return;
+    }
     listen(serverFd, 5);
 
     std::cout << "[cCANMocker] Bitmask Translator Core Active on Port 8082...\n";
@@ -75,31 +71,28 @@ void cCANMocker::MockingLoop() {
                 std::string subStr = request.substr(pos + 4);
                 size_t spacePos = subStr.find(" ");
                 std::string buttonId = (spacePos != std::string::npos) ? subStr.substr(0, spacePos) : subStr;
-
+                
                 if (!buttonId.empty() && buttonId.back() == '\r') buttonId.pop_back();
 
-                // Check if the button identifier exists in our sequence map
-                if (bitShiftMap.find(buttonId) != bitShiftMap.end()) {
-                    int targetBit = bitShiftMap[buttonId];
-                    
-                    // Rule: Selected target bit is set to 1, all remaining positions remain 0
-                    BYTE bitmaskPayload = static_cast<BYTE>(1 << targetBit);
+                auto matchIt = bitShiftMap.find(buttonId);
+                if (matchIt != bitShiftMap.end()) {
+                    BYTE bitmaskPayload = static_cast<BYTE>(1 << matchIt->second);
 
-                    // Build standard TPCANMsg instance
                     TPCANMsg frame{};
                     frame.ID = 0x001;
-                    frame.MSGTYPE = PCAN_MESSAGE_STANDARD; // 0x00U
-                    frame.LEN = 1;                         // 1 Byte data block length
-                    frame.DATA[0] = bitmaskPayload;        // Inject mapped dynamic state value
+                    frame.MSGTYPE = PCAN_MESSAGE_STANDARD; 
+                    frame.LEN = 1;                         
+                    frame.DATA[0] = bitmaskPayload;        
 
-                    std::cout << "\n[cCANMocker] Web Event '" << buttonId << "' -> Transpiled Bitmask: 0x" 
-                              << std::hex << (int)bitmaskPayload << "\n";
+                    // Only log the actual translation event
+                    std::cout << "[cCANMocker] Event '" << buttonId << "' -> Bitmask: 0x" 
+                              << std::hex << (int)bitmaskPayload << std::dec << "\n";
 
-                    // Access concrete loopback wrapper logic
                     auto concreteController = std::dynamic_pointer_cast<cPCANController>(m_PcanController);
                     if (concreteController) {
-                        // Deliver frame directly to the master receiver endpoint handler instance!
                         concreteController->InjectReceivedMessage(frame);
+                    } else {
+                        std::cerr << "[cCANMocker] Error: Controller instance is invalid or not cPCANController.\n";
                     }
                 }
             }
@@ -113,5 +106,6 @@ void cCANMocker::MockingLoop() {
         write(clientSocket, response.c_str(), response.length());
         close(clientSocket);
     }
+
     close(serverFd);
 }

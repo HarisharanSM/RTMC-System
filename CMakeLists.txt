@@ -9,6 +9,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/PCAN/include
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemController/include
     ${CMAKE_CURRENT_SOURCE_DIR}/CANMocker/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/drive/include 
 )
 
 add_executable(pcan_demo
@@ -16,6 +17,10 @@ add_executable(pcan_demo
     PCAN/src/cPCANSender.cpp
     PCAN/src/cPCANReceiver.cpp
     PCAN/src/cPCANController.cpp
+    PCAN/src/cCANDriveHandler.cpp
     SystemController/src/cControlManager.cpp
     CANMocker/src/cCANMocker.cpp
+    drive/src/cDrive.cpp  
+    drive/src/cDriveController.cpp
+    drive/src/cDriveCalculator.cpp
 )

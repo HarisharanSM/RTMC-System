@@ -1,37 +1,38 @@
 #include "cControlManager.h"
+#include "../../PCAN/include/cPCANController.h" 
+#include "../../drive/include/cDrive.h"         
 #include <iostream>
 
-cControlManager::cControlManager(std::shared_ptr<iPCANController> pcanController)
-    : m_PcanController(pcanController) {}
-
-cControlManager::~cControlManager() {
-    ShutdownSystem();
+cControlManager::cControlManager() {
+    // Instantiate concrete implementations directly into pure interface pointer storage positions
+    m_PcanController = std::make_shared<cPCANController>(PCAN_USBBUS1, PCAN_BAUD_500K);
+    m_DriveSubsystem = std::make_unique<cDrive>();
 }
 
-bool cControlManager::InitializeSystem() {
-    std::cout << "[cControlManager] Initializing Main Motion Loop via Interface...\n";
-    if (!m_PcanController) return false;
+cControlManager::~cControlManager() { ShutdownSystem(); }
 
-    return m_PcanController->Start([this](const TPCANMsg& msg) { 
-        this->OnCanFrameIntercepted(msg); 
-    });
+bool cControlManager::InitializeSystem() {
+    std::cout << "[cControlManager] Setting up encapsulated dependency injection stack...\n";
+    if (!m_PcanController || !m_DriveSubsystem) return false;
+
+    // 1. Fire up underlying drive components through interface abstract layer APIs
+    if (!m_DriveSubsystem->Initialize()) return false;
+
+    // 2. Start communication channel interface layer
+    if (!m_PcanController->Start()) return false;
+
+    // 3. Register multi-node interface reference callback binder map records safely
+    m_PcanController->SubscribeMessage(
+        DRIVE_MSG, 
+        std::bind(&iDrive::HandleJoystick, m_DriveSubsystem.get(), std::placeholders::_1)
+    );
+
+    return true;
 }
 
 void cControlManager::ShutdownSystem() {
-    if (m_PcanController && m_PcanController->IsRunning()) {
-        m_PcanController->Stop();
-        std::cout << "[cControlManager] Motion Systems Cleanly Interrupted.\n";
-    }
+    if (m_DriveSubsystem) m_DriveSubsystem->Release();
+    if (m_PcanController && m_PcanController->IsRunning()) m_PcanController->Stop();
 }
 
-void cControlManager::ProcessUiCommand(int axisId, double velocity) {
-    std::cout << "[cControlManager] Sending Standard Command Frame...\n";
-    BYTE payload[3] = { static_cast<BYTE>(axisId), 0x00, 0x00 };
-    m_PcanController->SendMessage(0x200, PCAN_MESSAGE_STANDARD, 3, payload);
-}
-
-void cControlManager::OnCanFrameIntercepted(const TPCANMsg& msg) {
-    std::cout << "[cControlManager Callback] Packet Received! ID: 0x" 
-              << std::hex << msg.ID << " | Type: " << (int)msg.MSGTYPE 
-              << " | Data[0]: 0x" << (int)msg.DATA[0] << "\n";
-}
+void cControlManager::ProcessUiCommand(int axisId, double velocity) {}

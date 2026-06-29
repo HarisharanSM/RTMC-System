@@ -1,5 +1,5 @@
 #pragma once
-#include "PCANTypes.h"
+#include "../../includes/PCANTypes.h"
 #include <iostream>
 
 class cPCANSender {

@@ -20,6 +20,9 @@ typedef uint8_t TPCANMessageType;
 #define PCAN_BAUD_500K         0x001C
 #define PCAN_ERROR_OK          0x0000U
 
+// Target configuration identifier token macro mapping
+#define DRIVE_MSG 0x001
+
 // Requested Custom CAN Message Structure
 typedef struct {
     DWORD            ID;        // CAN ID (11-bit standard or 29-bit extended)

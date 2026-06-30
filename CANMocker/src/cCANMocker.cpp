@@ -65,35 +65,61 @@ void cCANMocker::MockingLoop() {
         
         if (bytesRead > 0) {
             std::string request(buffer);
-            size_t pos = request.find("btn=");
+            size_t cmdPos = request.find("cmd=");
+            size_t btnPos = request.find("btn=");
             
-            if (pos != std::string::npos) {
-                std::string subStr = request.substr(pos + 4);
+            TPCANMsg frame{};
+            frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
+            frame.LEN = 1;
+            bool processFrame = false;
+
+            // Check if it's a lifecycle command (start/stop)
+            if (cmdPos != std::string::npos) {
+                std::string cmdSubStr = request.substr(cmdPos + 4);
+                size_t spacePos = cmdSubStr.find(" ");
+                size_t ampPos = cmdSubStr.find("&");
+                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
+                std::string cmdType = (cutPos != std::string::npos) ? cmdSubStr.substr(0, cutPos) : cmdSubStr;
+
+                if (cmdType.find("start") == 0) {
+                    frame.ID = 0x002; // StartDrive
+                    frame.DATA[0] = 0x01;
+                    processFrame = true;
+                    std::cout << "[cCANMocker] Internal Command -> Generated StartDrive (0x002)\n";
+                } else if (cmdType.find("stop") == 0) {
+                    frame.ID = 0x003; // StopDrive
+                    frame.DATA[0] = 0x00;
+                    processFrame = true;
+                    std::cout << "[cCANMocker] Internal Command -> Generated StopDrive (0x003)\n";
+                }
+            }
+            // Fallback: regular continuous signal processing loop
+            else if (btnPos != std::string::npos) {
+                std::string subStr = request.substr(btnPos + 4);
                 size_t spacePos = subStr.find(" ");
-                std::string buttonId = (spacePos != std::string::npos) ? subStr.substr(0, spacePos) : subStr;
+                size_t ampPos = subStr.find("&");
+                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
+                std::string buttonId = (cutPos != std::string::npos) ? subStr.substr(0, cutPos) : subStr;
                 
                 if (!buttonId.empty() && buttonId.back() == '\r') buttonId.pop_back();
 
                 auto matchIt = bitShiftMap.find(buttonId);
                 if (matchIt != bitShiftMap.end()) {
                     BYTE bitmaskPayload = static_cast<BYTE>(1 << matchIt->second);
-
-                    TPCANMsg frame{};
-                    frame.ID = 0x001;
-                    frame.MSGTYPE = PCAN_MESSAGE_STANDARD; 
-                    frame.LEN = 1;                         
-                    frame.DATA[0] = bitmaskPayload;        
-
-                    // Only log the actual translation event
+                    frame.ID = 0x001; // HandleJoystick
+                    frame.DATA[0] = bitmaskPayload;
+                    processFrame = true;
                     std::cout << "[cCANMocker] Event '" << buttonId << "' -> Bitmask: 0x" 
                               << std::hex << (int)bitmaskPayload << std::dec << "\n";
+                }
+            }
 
-                    auto concreteController = std::dynamic_pointer_cast<cPCANController>(m_PcanController);
-                    if (concreteController) {
-                        concreteController->InjectReceivedMessage(frame);
-                    } else {
-                        std::cerr << "[cCANMocker] Error: Controller instance is invalid or not cPCANController.\n";
-                    }
+            if (processFrame) {
+                auto concreteController = std::dynamic_pointer_cast<cPCANController>(m_PcanController);
+                if (concreteController) {
+                    concreteController->InjectReceivedMessage(frame);
+                } else {
+                    std::cerr << "[cCANMocker] Error: Controller instance is invalid.\n";
                 }
             }
         }

@@ -21,7 +21,10 @@ typedef uint8_t TPCANMessageType;
 #define PCAN_ERROR_OK          0x0000U
 
 // Target configuration identifier token macro mapping
-#define DRIVE_MSG 0x001
+#define DRIVE_MSG           0x001
+#define START_DRIVE_MSG     0x002
+#define STOP_DRIVE_MSG      0x003
+#define DRIVE_SIGNAL_MSG    0x004
 
 // Requested Custom CAN Message Structure
 typedef struct {

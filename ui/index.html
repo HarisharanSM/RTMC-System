@@ -6,89 +6,34 @@
     <title>RTMC Dual-Joystick Console</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            background-color: #121212;
-            color: #ffffff;
+            margin: 0; padding: 0; height: 100vh;
+            background-color: #121212; color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            overflow: hidden;
+            display: flex; justify-content: space-between; align-items: center; overflow: hidden;
         }
-
-        .wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
+        .wrapper { display: flex; flex-direction: column; align-items: center; }
         .wrapper-left { margin-left: 40px; }
         .wrapper-right { margin-right: 40px; }
-
-        .container-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-        }
-
+        .container-title { font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; }
         .left-title { color: #00adb5; }
         .right-title { color: #ff5722; }
-
         .control-container {
-            width: 220px;
-            height: 220px;
-            background-color: #1e1e1e;
-            border: 2px solid #333;
-            border-radius: 12px;
-            display: grid;
-            grid-template-areas: 
-                ".    up    ."
-                "left  .    right"
-                ".    down  .";
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 10px;
-            padding: 15px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            width: 220px; height: 220px; background-color: #1e1e1e; border: 2px solid #333; border-radius: 12px;
+            display: grid; grid-template-areas: ". up ." "left . right" ". down .";
+            grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; padding: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         }
-
         .left-pad { border-color: #00adb5; }
         .right-pad { border-color: #ff5722; }
-
         .btn {
-            background-color: #2d2d2d;
-            border: 1px solid #444;
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.1s ease;
-            user-select: none;
+            background-color: #2d2d2d; border: 1px solid #444; color: white; font-size: 1.5rem; font-weight: bold;
+            border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center;
+            transition: all 0.1s ease; user-select: none;
         }
-
         .btn:hover { background-color: #3d3d3d; }
         .btn:active { background-color: #00adb5; transform: scale(0.95); }
         .right-pad .btn:active { background-color: #ff5722; }
-
-        .up { grid-area: up; }
-        .down { grid-area: down; }
-        .left { grid-area: left; }
-        .right { grid-area: right; }
-
-        .center-status {
-            text-align: center;
-            font-size: 1.2rem;
-            letter-spacing: 2px;
-            color: #888;
-        }
+        .up { grid-area: up; } .down { grid-area: down; } .left { grid-area: left; } .right { grid-area: right; }
+        .center-status { text-align: center; font-size: 1.2rem; letter-spacing: 2px; color: #888; }
     </style>
 </head>
 <body>
@@ -96,10 +41,10 @@
     <div class="wrapper wrapper-left">
         <div class="container-title left-title">LAO/RAO, CRAN/CAUD</div>
         <div class="control-container left-pad">
-            <button class="btn up" onmousedown="startHold('L-up')" onmouseup="stopHold()" onmouseleave="stopHold()">▲</button>
-            <button class="btn left" onmousedown="startHold('L-left')" onmouseup="stopHold()" onmouseleave="stopHold()">◀</button>
-            <button class="btn right" onmousedown="startHold('L-right')" onmouseup="stopHold()" onmouseleave="stopHold()">▶</button>
-            <button class="btn down" onmousedown="startHold('L-down')" onmouseup="stopHold()" onmouseleave="stopHold()">▼</button>
+            <button class="btn up" data-btn="L-up">▲</button>
+            <button class="btn left" data-btn="L-left">◀</button>
+            <button class="btn right" data-btn="L-right">▶</button>
+            <button class="btn down" data-btn="L-down">▼</button>
         </div>
     </div>
 
@@ -111,47 +56,79 @@
     <div class="wrapper wrapper-right">
         <div class="container-title right-title">X, Y</div>
         <div class="control-container right-pad">
-            <button class="btn up" onmousedown="startHold('R-up')" onmouseup="stopHold()" onmouseleave="stopHold()">▲</button>
-            <button class="btn left" onmousedown="startHold('R-left')" onmouseup="stopHold()" onmouseleave="stopHold()">◀</button>
-            <button class="btn right" onmousedown="startHold('R-right')" onmouseup="stopHold()" onmouseleave="stopHold()">▶</button>
-            <button class="btn down" onmousedown="startHold('R-down')" onmouseup="stopHold()" onmouseleave="stopHold()">▼</button>
+            <button class="btn up" data-btn="R-up">▲</button>
+            <button class="btn left" data-btn="R-left">◀</button>
+            <button class="btn right" data-btn="R-right">▶</button>
+            <button class="btn down" data-btn="R-down">▼</button>
         </div>
     </div>
 
     <script>
         let holdInterval = null;
+        let initialDelayTimeout = null;
 
-        function transmitSignal(buttonId) {
+        function transmitSignal(buttonId, cmdType = "") {
             const currentUrl = window.location.href;
             const backendUrl = currentUrl.replace("-8000.", "-8082.").split('?')[0];
-            const targetAddress = `${backendUrl}?btn=${buttonId}`;
+            
+            // Generate distinct, unambiguous endpoint paths
+            let targetAddress = `${backendUrl}?btn=${buttonId}`;
+            if (cmdType !== "") {
+                targetAddress += `&cmd=${cmdType}`;
+            }
 
             fetch(targetAddress, {
                 method: 'GET',
-                mode: 'no-cors'
-            }).catch(err => console.log("Stream error omitted."));
+                mode: 'cors'
+            }).catch(err => { /* Drop empty frame responses safely */ });
         }
 
-        // Called immediately on pointer down
-        function startHold(buttonId) {
-            if (holdInterval !== null) return; // Prevent duplicate timers
+        function setupButtonLifecycle(buttonEl) {
+            const buttonId = buttonEl.getAttribute('data-btn');
+            
+            const startAction = (e) => {
+                e.preventDefault();
+                if (holdInterval !== null || initialDelayTimeout !== null) return;
 
-            // 1. Fire the initial single press immediately
-            transmitSignal(buttonId);
+                // 1. Instantly fire StartDrive message flag (0x002)
+                transmitSignal(buttonId, "start");
 
-            // 2. Set up the repeating loop every 50ms for press-and-hold
-            holdInterval = setInterval(() => {
-                transmitSignal(buttonId);
-            }, 50);
+                // 2. Queue up the continuous streaming loop sequence (0x001)
+                initialDelayTimeout = setTimeout(() => {
+                    holdInterval = setInterval(() => {
+                        transmitSignal(buttonId);
+                    }, 50);
+                }, 50);
+            };
+
+            const stopAction = () => {
+                if (initialDelayTimeout !== null) {
+                    clearTimeout(initialDelayTimeout);
+                    initialDelayTimeout = null;
+                }
+                if (holdInterval !== null) {
+                    clearInterval(holdInterval);
+                    holdInterval = null;
+                }
+                // 3. Fire StopDrive message flag (0x003)
+                transmitSignal("none", "stop");
+            };
+
+            // Dynamic pointer mappings
+            buttonEl.addEventListener('mousedown', startAction);
+            buttonEl.addEventListener('touchstart', startAction, { passive: false });
+            
+            buttonEl.addEventListener('mouseup', stopAction);
+            buttonEl.addEventListener('mouseleave', stopAction);
+            buttonEl.addEventListener('touchend', stopAction);
         }
 
-        // Called on pointer up or when mouse leaves the button boundaries
-        function stopHold() {
-            if (holdInterval !== null) {
-                clearInterval(holdInterval);
-                holdInterval = null;
-            }
-        }
+        // Initialize listener attachments when page elements land
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll('.btn').forEach(btn => {
+                setupButtonLifecycle(btn);
+            });
+        });
     </script>
 </body>
 </html>

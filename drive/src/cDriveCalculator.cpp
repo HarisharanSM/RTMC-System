@@ -3,7 +3,6 @@
 #include <iostream>
 
 #define PI                  3.141592653589793
-#define MAX_SPEED           60.0f                          //In degrees per second
 #define MAX_DEG_PER_STEP    MAX_SPEED * TIME_DELTA/1000.0f //In degrees
 #define ACC_RATE            120.0f                         //In degrees per second squared
 #define LINK1_LEN           75.0f                          //In cm

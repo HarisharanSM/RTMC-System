@@ -1,9 +1,10 @@
 #include "../include/cDriveController.h"
 
-cDriveController::cDriveController()
+cDriveController::cDriveController(std::shared_ptr<iPCANController> pCANptr)
     : m_IsEmergencyStopped(false), 
       m_CurrentErrorCode(0), 
-      m_CurrentPosition{0,0,0,0} {
+      m_CurrentPosition{0,0,0,0},
+      m_pCANController(pCANptr) {
     std::cout << "[cDriveController] Internal state engine online.\n";
     
     m_ptrCalculator = std::make_unique<cDriveCalculator>();
@@ -40,7 +41,37 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
                   << ", A2=" << axelPos.A2 
                   << ", A3=" << axelPos.A3 
                   << ", A4=" << axelPos.A4 << "\n";
+
+        if(m_pCANController){
+            m_pCANController->SetPosition(axelPos);
+        }
     }
+}
+
+void cDriveController::StartDrive(const joystickSignal& signal) {
+    if (m_IsEmergencyStopped) {
+        std::cout << "[cDriveController] Cannot start drive: Emergency stop is active.\n";
+        return;
+    }
+    if (m_CurrentErrorCode != 0) {
+        std::cout << "[cDriveController] Cannot start drive: Active error code " << m_CurrentErrorCode << " must be cleared first.\n";
+        return;
+    }
+    std::cout << "[cDriveController] Drive started successfully.\n";
+    
+    if(m_pCANController){
+        m_pCANController->SetSpeed(MAX_SPEED); 
+    }
+    HandleJoystick(signal);
+}
+
+void cDriveController::StopDrive(const joystickSignal& signal) {
+    std::cout << "[cDriveController] Drive stopped successfully.\n";
+    
+    if(m_pCANController){
+        m_pCANController->SetSpeed(0.0f); 
+    }
+    HandleJoystick(signal);
 }
 
 void cDriveController::SetError(int errorCode) {
@@ -50,9 +81,17 @@ void cDriveController::SetError(int errorCode) {
     } else {
         std::cout << "[cDriveController] Active faults cleared.\n";
     }
+
+    if(m_pCANController){
+        m_pCANController->SetSpeed(0.0f); 
+    }
 }
 
 void cDriveController::SetEmgStop() {
     m_IsEmergencyStopped = true;
     std::cerr << "[cDriveController] Emergency flag set. Motion tracks isolated.\n";
+
+    if(m_pCANController){
+        m_pCANController->SetSpeed(0.0f); 
+    }
 }

@@ -2,20 +2,29 @@
 #include <iostream>
 
 cDrive::cDrive() {
-    m_Controller = std::make_unique<cDriveController>();
+    m_Controller = nullptr;
 }
 
 cDrive::~cDrive(){
     Release();
 }
 
-bool cDrive::Initialize() {
+bool cDrive::Initialize(std::shared_ptr<iPCANController> pCANptr) {
     std::cout << "[cDrive] Initialising...\n";
+    m_Controller = std::make_unique<cDriveController>(pCANptr);
     return true;
 }
 
 void cDrive::HandleJoystick(const joystickSignal& signal) {
     if (m_Controller) m_Controller->HandleJoystick(signal);
+}
+
+void cDrive::StartDrive(const joystickSignal& signal) {
+    if (m_Controller) m_Controller->StartDrive(signal);
+}
+
+void cDrive::StopDrive(const joystickSignal& signal) {
+    if (m_Controller) m_Controller->StopDrive(signal);
 }
 
 void cDrive::SetError(int errorCode) {

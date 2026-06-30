@@ -1,6 +1,7 @@
 #pragma once
 
-#define TIME_DELTA  50 //ms
+#define TIME_DELTA  50      //ms
+#define MAX_SPEED   60.0f   //In degrees per second
 
 /**
  * @brief Represents the physical position coordinates of the drive system.

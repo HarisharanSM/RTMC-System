@@ -9,11 +9,11 @@ private:
     std::shared_ptr<iPCANController> m_PcanController;
     std::unique_ptr<iDrive> m_DriveSubsystem;
     
-    // Internal callback route to catch returning system logs or frames
-    void OnCanFrameIntercepted(const TPCANMsg& msg);
+    // Core callback functions owned directly by cControlManager
+    void HandleStartDriveSignal(const joystickSignal& msg);
+    void HandleStopDriveSignal(const joystickSignal& msg);
 
 public:
-    // Dependency Injection pattern allows mocking PCAN easily during tests
     cControlManager();
     ~cControlManager() override;
 

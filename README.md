@@ -38,7 +38,7 @@ The system is built around three interfaces (`includes/iSystemController.h`, `iP
 | `PCAN/` | Simulated CAN transport layer — `cPCANSender`/`cPCANReceiver` (stubbed I/O), `cPCANController` (bus orchestrator with a pub/sub subscription registry keyed by CAN message ID), `cCANDriveHandler` (decodes raw CAN frames into `joystickSignal`) |
 | `SystemController/` | `cControlManager` — the composition root; wires the CAN controller and drive together and routes `DRIVE_MSG`/`START_DRIVE_MSG`/`STOP_DRIVE_MSG` to the appropriate drive calls |
 | `CANMocker/` | `cCANMocker` — a minimal HTTP server (raw POSIX sockets, port 8082) that translates GET requests from the web UI into `TPCANMsg` CAN frames and injects them into the bus |
-| `drive/` | Motion subsystem — `cDrive` (façade), `cDriveController` (stateful engine: e-stop, error handling, current position), `cDriveCalculator` (trapezoidal velocity-profile motion integration, workspace limit clamping, and 2-link planar-arm inverse kinematics) |
+| `drive/` | Motion subsystem — `cDrive` (façade), `cDriveController` (stateful engine: e-stop, error handling, current position), `cDriveCalculator` (2-link planar-arm forward/inverse kinematics, reach and joint-limit gating, trapezoidal velocity profiling) — see [docs/kinematics-model.md](docs/kinematics-model.md) |
 | `ui/` | `index.html` — a self-contained dual-joystick dashboard (left pad: LAO/RAO & CRAN/CAUD, right pad: X/Y) that polls the CAN mocker over HTTP while a button is held |
 
 ## Building
@@ -51,7 +51,19 @@ cmake ..
 cmake --build .
 ```
 
-This produces the `pcan_demo` executable.
+This produces the `pcan_demo` executable and the `rtmc_tests` test binary.
+
+## Tests
+
+```bash
+cd build && ctest --output-on-failure     # or: ./build/rtmc_tests
+```
+
+`rtmc_tests` is a self-contained BDD suite covering the drive kinematics — home
+pose, IK/FK round-trip, reach and joint limits, motion profiling, position/angle
+consistency and the safety interlocks. Each scenario prints its Given/When/Then
+and maps to an ID in [docs/kinematics-bdd.md](docs/kinematics-bdd.md); the
+design rationale is in [docs/kinematics-model.md](docs/kinematics-model.md).
 
 ## Running
 

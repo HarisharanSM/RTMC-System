@@ -9,7 +9,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/PCAN/include
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemController/include
     ${CMAKE_CURRENT_SOURCE_DIR}/CANMocker/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/drive/include 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drive/include
 )
 
 add_executable(pcan_demo
@@ -20,7 +20,18 @@ add_executable(pcan_demo
     PCAN/src/cCANDriveHandler.cpp
     SystemController/src/cControlManager.cpp
     CANMocker/src/cCANMocker.cpp
-    drive/src/cDrive.cpp  
+    drive/src/cDrive.cpp
     drive/src/cDriveController.cpp
     drive/src/cDriveCalculator.cpp
 )
+
+# --- Tests -----------------------------------------------------------------
+enable_testing()
+
+add_executable(rtmc_tests
+    tests/test_kinematics.cpp
+    drive/src/cDriveController.cpp
+    drive/src/cDriveCalculator.cpp
+)
+
+add_test(NAME kinematics COMMAND rtmc_tests)

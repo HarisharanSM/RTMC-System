@@ -1,0 +1,789 @@
+{
+  "bodies": [
+    {
+      "center_m": [
+        -0.25,
+        0.0,
+        0.175
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "robot_base",
+      "mobility": "static",
+      "rigid_body": "robot_base",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.55,
+        0.6,
+        0.35
+      ]
+    },
+    {
+      "center_m": [
+        0.375,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link1",
+      "id": "link1_housing",
+      "mobility": "articulated",
+      "rigid_body": "link1",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.75,
+        0.2,
+        0.16
+      ]
+    },
+    {
+      "center_m": [
+        0.75,
+        0,
+        0.12500000000000003
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link1",
+      "id": "elbow_housing",
+      "mobility": "articulated",
+      "rigid_body": "link1",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.24,
+        0.25
+      ]
+    },
+    {
+      "center_m": [
+        0.5,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link2",
+      "id": "link2_housing",
+      "mobility": "articulated",
+      "rigid_body": "link2",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        1.0,
+        0.16,
+        0.14
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.45,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "eof_support",
+      "id": "support_rear_beam",
+      "mobility": "articulated",
+      "rigid_body": "link2",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.16,
+        1.06,
+        0.16
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.9,
+        0.25999999999999995
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "eof_support",
+      "id": "support_column",
+      "mobility": "articulated",
+      "rigid_body": "link2",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.16,
+        0.16,
+        0.5199999999999999
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.050311397915169004,
+        0.7676035985006303
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_00",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 1.6362461737446838,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.15007335177822398,
+        0.7544696881103605
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_01",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 1.7671458676442586,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.24726750898415972,
+        0.7284265921780065
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_02",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 1.8980455615438334,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.34023085055587116,
+        0.6899199152954811
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_03",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.028945255443408,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.4273727479447588,
+        0.639608517380312
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_04",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.1598449493429825,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.5072021791262008,
+        0.5783532403997824
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_05",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.2907446432425576,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.5783532403997824,
+        0.5072021791262009
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_06",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.421644337142132,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.6396085173803118,
+        0.42737274794475927
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_07",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.5525440310417067,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.689919915295481,
+        0.34023085055587127
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_08",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.6834437249412817,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7284265921780064,
+        0.24726750898415983
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_09",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.8143434188408563,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7544696881103605,
+        0.15007335177822428
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_10",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 2.945243112740431,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7676035985006303,
+        0.050311397915169496
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_11",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.0761428066400054,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7676035985006303,
+        -0.05031139791516896
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_12",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.2070425005395804,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7544696881103606,
+        -0.15007335177822376
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_13",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.337942194439155,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.7284265921780065,
+        -0.24726750898415967
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_14",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.46884188833873,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.6899199152954811,
+        -0.3402308505558711
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_15",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.5997415822383045,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.6396085173803121,
+        -0.4273727479447588
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_16",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.730641276137879,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.5783532403997828,
+        -0.5072021791262006
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_17",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.8615409700374537,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.507202179126201,
+        -0.5783532403997824
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_18",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 3.9924406639370287,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.427372747944759,
+        -0.6396085173803119
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_19",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 4.123340357836604,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.34023085055587193,
+        -0.6899199152954807
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_20",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 4.254240051736177,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.2472675089841599,
+        -0.7284265921780064
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_21",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 4.385139745635753,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.15007335177822434,
+        -0.7544696881103604
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_22",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 4.516039439535327,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        -0.05031139791516954,
+        -0.7676035985006303
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_23",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 4.646939133434902,
+      "shape": "box",
+      "size_m": [
+        0.22,
+        0.1414987537329776,
+        0.10987725710664034
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        0.6
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "detector_housing",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.48,
+        0.42,
+        0.245
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        -0.62
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "source_housing",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.38,
+        0.4,
+        0.285
+      ]
+    },
+    {
+      "center_m": [
+        0.9,
+        0,
+        0.9
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_top",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        2.2,
+        0.55,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        1.7,
+        0,
+        0.475
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_pedestal",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.4,
+        0.45,
+        0.75
+      ]
+    },
+    {
+      "center_m": [
+        1.7,
+        0,
+        0.05
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_base",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.9,
+        0.8,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        0.9,
+        0,
+        0.9750000000000001
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "mattress",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        2.0,
+        0.53,
+        0.05
+      ]
+    },
+    {
+      "center_m": [
+        0.9,
+        0,
+        1.15
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "patient_test_envelope",
+      "mobility": "static",
+      "rigid_body": "patient_fixture",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        1.8,
+        0.5,
+        0.3
+      ]
+    },
+    {
+      "center_m": [
+        0.5,
+        0,
+        -0.05
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "floor",
+      "mobility": "static",
+      "rigid_body": "floor",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        6.0,
+        5.0,
+        0.1
+      ]
+    }
+  ],
+  "frames": [
+    "world",
+    "link1",
+    "link2",
+    "eof_support",
+    "carm"
+  ],
+  "hardware_authorization": false,
+  "model_id": "rtmc-pheno-inspired-fixed-table-v1",
+  "pair_margin_m": 0.02,
+  "pair_policy": {
+    "adjacent_body_exclusions": [],
+    "default": "check all robot-environment and inter-body robot pairs",
+    "note": "No blanket adjacent-link exclusions. Intended joints/floor support contacts require reviewed local contact masks before runtime use. Preview poses are not certified collision-free.",
+    "same_rigid_body": "exclude internal primitive overlaps"
+  },
+  "schema_version": 1,
+  "status": "simulation_only",
+  "transform_layout": "row-major 4x4; column vectors; local point to world",
+  "uncertainty_status": "unmeasured; margin is illustrative, not a physical bound",
+  "units": {
+    "angle": "rad",
+    "length": "m",
+    "time": "s"
+  }
+}

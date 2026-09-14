@@ -1,4 +1,6 @@
 #include "../include/cDrive.h"
+#include "cCollisionSupervisor.h"
+#include "cSceneRegistry.h"
 #include <iostream>
 
 cDrive::cDrive() {
@@ -11,7 +13,9 @@ cDrive::~cDrive(){
 
 bool cDrive::Initialize(std::shared_ptr<iPCANController> pCANptr) {
     std::cout << "[cDrive] Initialising...\n";
-    m_Controller = std::make_unique<cDriveController>(pCANptr);
+    auto supervisor = std::make_unique<RTMCCollision::cCollisionSupervisor>(
+        RTMCCollision::cSceneRegistry::CreateReferenceScene(true));
+    m_Controller = std::make_unique<cDriveController>(pCANptr, std::move(supervisor));
     return true;
 }
 
@@ -37,6 +41,7 @@ void cDrive::SetEmgStop() {
 
 void cDrive::Release() {
     std::cout << "[cDrive] Released.\n";
+    m_Controller.reset();
 }
 
 drivePosition cDrive::GetCurrentPosition() const {

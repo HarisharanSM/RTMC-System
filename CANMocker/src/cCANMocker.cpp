@@ -73,6 +73,20 @@ void cCANMocker::MockingLoop() {
             frame.LEN = 1;
             bool processFrame = false;
 
+            BYTE requestedDirection = 0;
+            if (btnPos != std::string::npos) {
+                std::string subStr = request.substr(btnPos + 4);
+                size_t spacePos = subStr.find(" ");
+                size_t ampPos = subStr.find("&");
+                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
+                std::string buttonId = (cutPos != std::string::npos) ? subStr.substr(0, cutPos) : subStr;
+                if (!buttonId.empty() && buttonId.back() == '\r') buttonId.pop_back();
+                auto matchIt = bitShiftMap.find(buttonId);
+                if (matchIt != bitShiftMap.end()) {
+                    requestedDirection = static_cast<BYTE>(1 << matchIt->second);
+                }
+            }
+
             // Check if it's a lifecycle command (start/stop)
             if (cmdPos != std::string::npos) {
                 std::string cmdSubStr = request.substr(cmdPos + 4);
@@ -83,9 +97,10 @@ void cCANMocker::MockingLoop() {
 
                 if (cmdType.find("start") == 0) {
                     frame.ID = 0x002; // StartDrive
-                    frame.DATA[0] = 0x01;
-                    processFrame = true;
-                    std::cout << "[cCANMocker] Internal Command -> Generated StartDrive (0x002)\n";
+                    frame.DATA[0] = requestedDirection;
+                    processFrame = requestedDirection != 0;
+                    std::cout << "[cCANMocker] Internal Command -> Generated StartDrive (0x002) with direction 0x"
+                              << std::hex << static_cast<int>(requestedDirection) << std::dec << "\n";
                 } else if (cmdType.find("stop") == 0) {
                     frame.ID = 0x003; // StopDrive
                     frame.DATA[0] = 0x00;

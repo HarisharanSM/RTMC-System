@@ -51,7 +51,8 @@ cmake ..
 cmake --build .
 ```
 
-This produces the `pcan_demo` executable and the `rtmc_tests` test binary.
+This produces `pcan_demo`, the existing `rtmc_tests` kinematics suite, and the
+`collision_tests` predictive-avoidance suite.
 
 ## Tests
 
@@ -64,6 +65,8 @@ pose, IK/FK round-trip, reach and joint limits, motion profiling, position/angle
 consistency and the safety interlocks. Each scenario prints its Given/When/Then
 and maps to an ID in [docs/kinematics-bdd.md](docs/kinematics-bdd.md); the
 design rationale is in [docs/kinematics-model.md](docs/kinematics-model.md).
+`collision_tests` covers predictive stopping paths, static and self-collision
+geometry, asynchronous supervision, permit renewal and the protective-stop latch.
 
 ## Running
 
@@ -78,8 +81,37 @@ On startup, `pcan_demo`:
 
 Then open `http://localhost:8000` in a browser and use the on-screen joystick buttons to drive the simulated motion pipeline; system activity is logged to stdout in place of real CAN traffic.
 
-> **Note:** the UI serving path in `main.cpp` and the UI's backend URL derivation (it rewrites `-8000.` to `-8082.` in the page URL) are currently hardcoded for a specific devcontainer/Codespaces-style setup. Running outside that environment may require adjusting the static file path in `main.cpp` and the mocker URL logic in `ui/index.html`.
+> **Note:** the UI serving path in `main.cpp` is still repository-layout dependent.
+> The dashboard automatically selects `localhost:8082` for local use and rewrites
+> a forwarded `-8000.` host to `-8082.` for a devcontainer-style environment.
 
 ## Status
 
 This is a simulator/prototype: there is no dependency on the real PCANBasic SDK or physical motor hardware, and several pieces (e.g. `iSystemController::ProcessUiCommand`) are stubs. It's intended for exercising and demonstrating the motion-control architecture end-to-end in software.
+
+## Predictive collision avoidance design and 3D reference
+
+The [collision avoidance architecture](docs/collision-avoidance/architecture.md)
+specifies asynchronous preflight, a parallel collision worker, finite movement
+permissions, whole-body stopping envelopes and a protective-stop latch that
+requires controller Stop before a new Start. The C++ simulation implementation
+and its current limits are recorded in the [implementation status](docs/collision-avoidance/implementation.md).
+
+The [3D data specification](docs/collision-avoidance/data-specification.md)
+documents a pheno-inspired C-arm adapted to this repository's 75/100 cm planar
+arm, plus a fixed patient table. [Editable parameters](data/collision/reference/parameters.json),
+frame-local and assembled OBJ models, scene JSON, and an
+[offline interactive viewer](data/collision/reference/generated/viewer.html)
+are provided. Open the viewer HTML in a browser to inspect poses.
+
+The simulator now runs predictive collision avoidance. All new housing/table
+dimensions, stopping values and 3D joint-frame conventions are explicitly
+synthetic; the implementation and reference bundle cannot authorize physical motion.
+
+```sh
+python3 tools/generate_collision_reference.py --check
+python3 tests/test_collision_reference.py
+```
+
+See the [verification record](docs/collision-avoidance/verification.md) for completed
+checks and the distinction from future runtime/hardware acceptance tests.

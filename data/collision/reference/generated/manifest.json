@@ -1,0 +1,23 @@
+{
+  "files": {
+    "frames/carm.obj": "edc3f7c130030c2a0d1fa038b2cb1147bd36bf7b047887af6e883374bfcd48b0",
+    "frames/eof_support.obj": "2afc2a41ed908a6bef43ce07b29f8380b7fbb1358529279f6d394e07fac68ba7",
+    "frames/link1.obj": "ba2b0b6a9444aa9f922f95b06ca38010644af96b2aa6f1bff1a3b947642c6a51",
+    "frames/link2.obj": "15b3a647d726e2f2137a0a3b6e5510ca3de35a25374b2d47e636b959f7317dc9",
+    "frames/world.obj": "15c6d91b806e4313af01f27346b5c692314734a091a6e20f6978e03c9ea4eee2",
+    "poses/extended.json": "e179c39f44cab750d1867fc56476f220f9da80412a5478c8355e54993cdda197",
+    "poses/extended.obj": "5a7b7b932015343ee2ff9dfe18c6992bf5184b1bfd4cad658136ee71866c5d6e",
+    "poses/home.json": "60cd91cd8bf8867f1e63242e90b91cff5de8dfa5006b3125754f5438c88e3ce7",
+    "poses/home.obj": "2789266447d110f90d8a6e3a8af4b2f212cd8ad26dc530e77aaea8a58b242740",
+    "poses/oblique.json": "2212c886b145243dd6c081d4c4fa589633fbf37b45592b4a31866ef732a4969e",
+    "poses/oblique.obj": "dd94281e733b523aa03cf7b137a3ad89a7bbaecefb614982ed877189a57b7eac",
+    "scene.json": "94516ad4c2110c890d5e4fd5e80e7858baabe25f89d09c0521a52086f65df4d4",
+    "viewer.html": "f87f5d07b235d74b47348469e7afcbf67a946186f9c061c090abc92f796bdce9"
+  },
+  "generator_sha256": "db87f5ec45a9436abcf8765fabc878dc84b1bad4a290cd311da2904a2ac9a223",
+  "hardware_authorization": false,
+  "model_id": "rtmc-pheno-inspired-fixed-table-v1",
+  "parameter_sha256": "a150b91db25ede4e428aac38eb392698e55543e5b739617369133c19074cd2cf",
+  "status": "simulation_only",
+  "viewer_template_sha256": "abe957c8b655613bd8d3dabf7f116e350ec7216391c9044397809fadef5dca9d"
+}

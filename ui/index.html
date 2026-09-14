@@ -68,11 +68,17 @@
         let initialDelayTimeout = null;
 
         function transmitSignal(buttonId, cmdType = "") {
-            const currentUrl = window.location.href;
-            const backendUrl = currentUrl.replace("-8000.", "-8082.").split('?')[0];
+            const backend = new URL(window.location.href);
+            backend.search = "";
+            backend.hash = "";
+            if (backend.hostname.includes("-8000.")) {
+                backend.hostname = backend.hostname.replace("-8000.", "-8082.");
+            } else {
+                backend.port = "8082";
+            }
             
             // Generate distinct, unambiguous endpoint paths
-            let targetAddress = `${backendUrl}?btn=${buttonId}`;
+            let targetAddress = `${backend.toString()}?btn=${encodeURIComponent(buttonId)}`;
             if (cmdType !== "") {
                 targetAddress += `&cmd=${cmdType}`;
             }

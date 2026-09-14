@@ -7,7 +7,16 @@ The positioner is a 2-link planar arm rotating about a common Z axis:
 - **A1** — base axle.
 - **A2** — mounted on A1's hand end; its own hand end carries the C-arm.
 - The combination of A1 and A2 yields the end-effector (EOF) position **(X, Y)**.
-- **A3 / A4** — LAO/RAO and CRAN/CAUD, pass-through angular axes.
+- **A3** — Z-axis yaw compensation at the link-2 endpoint, parallel to the A1/A2 axes: `A3=-(A1+A2)`.
+- **A4 / A5** — LAO/RAO and CRAN/CAUD, about the moving imaging center.
+
+Revision 2 fixes the patient head at `(0,0,1.20)` m. X/Y are always offsets from
+that initial head frame; +X points toward the feet, Y is transverse, Z is up.
+A1/A2 planar geometry and the closed-home numeric coordinates are unchanged.
+A3 removes link heading from the support and C-arm orientation, so changing X/Y
+never rotates the requested translation axes. LAO/CRAN keep the current imaging
+center fixed; at X=Y=0 this is the head. See the detailed five-axis contract and
+runtime completion gate in [the avoidance architecture](collision-avoidance/architecture.md#17-five-axis-head-reference-and-live-runtime-completion).
 
 Every 50 ms, while a UI button is held, the backend receives an input. X or Y is
 incremented in the direction commanded, **bounded by what A1 and A2 can actually
@@ -122,7 +131,7 @@ values:
 
 ```
 A1 in [-180, +10] deg      A2 in [0, 180] deg
-A3 in [-180, +180] deg     A4 in [-180, +180] deg
+A3 in [-180, +180] deg     A4 in [-180, +180] deg     A5 in [-180, +180] deg
 ```
 
 A1 = −180° and A2 = 180° are the closed pose; A1 = A2 = 0° is full extension.

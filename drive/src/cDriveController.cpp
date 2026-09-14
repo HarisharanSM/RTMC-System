@@ -7,7 +7,7 @@
 
 namespace {
 
-constexpr auto PREFLIGHT_DEADLINE = std::chrono::milliseconds(200);
+constexpr auto PREFLIGHT_DEADLINE = std::chrono::milliseconds(150);
 
 }
 
@@ -54,6 +54,7 @@ cDriveController::cDriveController(
 cDriveController::~cDriveController() {
     m_SafetyMonitorRunning.store(false);
     if (m_SafetyMonitor.joinable()) m_SafetyMonitor.join();
+    if (m_pCANController && m_CollisionSupervisor) m_pCANController->SetSpeed(0.0f);
     if (m_CollisionSupervisor) m_CollisionSupervisor->Stop();
 }
 
@@ -61,8 +62,11 @@ void cDriveController::SafetyMonitorLoop() {
     while (m_SafetyMonitorRunning.load(std::memory_order_acquire)) {
         const std::uint64_t session = m_Session.load(std::memory_order_acquire);
         const eLifecycleState state = m_LifecycleState.load(std::memory_order_acquire);
+        const auto deadline = m_MonitorDeadlineNs.load(std::memory_order_acquire);
+        const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         if ((state == eLifecycleState::Preflight || state == eLifecycleState::Running) &&
-            m_CollisionSupervisor->IsStopRequested(session)) {
+            (m_CollisionSupervisor->IsStopRequested(session) || (deadline > 0 && now >= deadline))) {
             MonitorStop();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -70,12 +74,15 @@ void cDriveController::SafetyMonitorLoop() {
 }
 
 void cDriveController::MonitorStop() {
+    std::lock_guard<std::mutex> lock(m_CommandMutex);
     eLifecycleState state = m_LifecycleState.load(std::memory_order_acquire);
     while (state == eLifecycleState::Preflight || state == eLifecycleState::Running) {
         if (m_LifecycleState.compare_exchange_weak(state, eLifecycleState::AvoidanceLatched,
                                                    std::memory_order_acq_rel)) {
-            std::lock_guard<std::mutex> lock(m_CommandMutex);
             if (m_pCANController) m_pCANController->SetSpeed(0.0f);
+            if (m_pCANController) m_pCANController->PublishAvoidanceStatus("AvoidanceLatched",
+                m_CollisionSupervisor->IsStopRequested(m_Session.load()) ?
+                m_CollisionSupervisor->StopReason() : "Collision permission renewal deadline expired");
             std::cerr << "[cDriveController] Predictive avoidance monitor stopped the drive. "
                          "Controller Stop is required before restart.\n";
             return;
@@ -110,6 +117,8 @@ bool cDriveController::SubmitCollisionRequest() {
     request.angularSpeedRadps = MAX_ANGULAR_SPEED_DPS * 3.14159265358979323846 / 180.0;
     request.velocityMeasured = false;
     m_PermitDeadline = std::chrono::steady_clock::now() + PREFLIGHT_DEADLINE;
+    m_MonitorDeadlineNs.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        m_PermitDeadline.time_since_epoch()).count(), std::memory_order_release);
     return m_CollisionSupervisor->Submit(request);
 }
 
@@ -119,6 +128,7 @@ void cDriveController::ProtectiveStop(const char* reason) {
     {
         std::lock_guard<std::mutex> lock(m_CommandMutex);
         if (m_pCANController) m_pCANController->SetSpeed(0.0f);
+        if (m_pCANController) m_pCANController->PublishAvoidanceStatus("AvoidanceLatched", reason);
     }
     std::cerr << "[cDriveController] Predictive avoidance stop: " << reason
               << ". Controller Stop is required before restart.\n";
@@ -153,6 +163,8 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
         }
 
         RTMCCollision::CollisionPermit permit{};
+        // Input packets must not accelerate the 50 ms simulation clock.
+        if (std::chrono::steady_clock::now() < m_NextMotionAt) return;
         if (!m_CollisionSupervisor->TryConsume(session, m_CollisionSequence, permit)) {
             if (std::chrono::steady_clock::now() > m_PermitDeadline) {
                 ProtectiveStop("collision permission deadline expired");
@@ -174,7 +186,14 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
             m_pCANController->SetSpeed(static_cast<float>(MAX_JOINT_SPEED_DPS));
         }
         if (!ApplyMotion(signal)) return;
-        m_LifecycleState.store(eLifecycleState::Running, std::memory_order_release);
+        m_NextMotionAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
+        auto expected = state;
+        if (!m_LifecycleState.compare_exchange_strong(expected, eLifecycleState::Running)) return;
+        {
+            std::lock_guard<std::mutex> lock(m_CommandMutex);
+            if (m_LifecycleState.load() != eLifecycleState::Running) return;
+            if (m_pCANController) m_pCANController->PublishAvoidanceStatus("Running", permit.reason, true);
+        }
         ++m_CollisionSequence;
         if (!SubmitCollisionRequest()) ProtectiveStop("collision request mailbox is unavailable");
         return;
@@ -221,7 +240,7 @@ bool cDriveController::ApplyMotion(const joystickSignal& signal) {
     std::cout << "[cDriveController] Axles: A1=" << m_CurrentAxelPosition.A1
               << ", A2=" << m_CurrentAxelPosition.A2
               << ", A3=" << m_CurrentAxelPosition.A3
-              << ", A4=" << m_CurrentAxelPosition.A4 << "\n";
+              << ", A4=" << m_CurrentAxelPosition.A4 << ", A5=" << m_CurrentAxelPosition.A5 << "\n";
 
     if (m_pCANController) {
         m_pCANController->SetPosition(m_CurrentAxelPosition);
@@ -258,7 +277,9 @@ void cDriveController::StartDrive(const joystickSignal& signal) {
             m_Session.store(session, std::memory_order_release);
         }
         m_CollisionSequence = 1;
+        m_NextMotionAt = std::chrono::steady_clock::time_point{};
         m_ActiveDirection = signal;
+        m_MonitorDeadlineNs.store(0, std::memory_order_release);
         m_LifecycleState.store(eLifecycleState::Preflight, std::memory_order_release);
         m_CollisionSupervisor->BeginSession(session);
         if (!SubmitCollisionRequest()) {
@@ -266,6 +287,11 @@ void cDriveController::StartDrive(const joystickSignal& signal) {
             return;
         }
         std::cout << "[cDriveController] Start accepted; waiting for collision preflight.\n";
+        {
+            std::lock_guard<std::mutex> lock(m_CommandMutex);
+            if (m_pCANController && m_LifecycleState.load() == eLifecycleState::Preflight)
+                m_pCANController->PublishAvoidanceStatus("Preflight", "Checking requested direction and stopping path");
+        }
         return;
     }
 
@@ -296,6 +322,8 @@ void cDriveController::StopDrive(const joystickSignal& /*signal*/) {
         m_LifecycleState.store(eLifecycleState::Disarmed, std::memory_order_release);
         m_ActiveDirection = {0, 0, 0, 0};
         m_CollisionSequence = 0;
+        m_MonitorDeadlineNs.store(0, std::memory_order_release);
+        if (m_pCANController) m_pCANController->PublishAvoidanceStatus("Disarmed", "Controller Stop acknowledged; fresh Start required");
     }
 }
 

@@ -16,8 +16,8 @@ inline bool WithinLimit(double value, double lower, double upper, double toleran
 }
 
 inline double MaxJointDelta(const AxelPostion& from, const AxelPostion& to) {
-    return std::max(std::max(std::abs(to.A1 - from.A1), std::abs(to.A2 - from.A2)),
-                    std::max(std::abs(to.A3 - from.A3), std::abs(to.A4 - from.A4)));
+    return std::max({std::abs(to.A1-from.A1), std::abs(to.A2-from.A2),
+                     std::abs(to.A3-from.A3), std::abs(to.A4-from.A4), std::abs(to.A5-from.A5)});
 }
 
 // Number of bisection steps used to find the largest feasible fraction of a
@@ -40,8 +40,8 @@ inline drivePosition ClampToLimits(const drivePosition& pos) {
     drivePosition clamped = pos;
     clamped.X    = ClampTo(pos.X, ENVELOPE_MIN_X_CM, ENVELOPE_MAX_X_CM);
     clamped.Y    = ClampTo(pos.Y, ENVELOPE_MIN_Y_CM, ENVELOPE_MAX_Y_CM);
-    clamped.LAO  = ClampTo(pos.LAO, A3_MIN_DEG, A3_MAX_DEG);
-    clamped.CRAN = ClampTo(pos.CRAN, A4_MIN_DEG, A4_MAX_DEG);
+    clamped.LAO  = ClampTo(pos.LAO, A4_MIN_DEG, A4_MAX_DEG);
+    clamped.CRAN = ClampTo(pos.CRAN, A5_MIN_DEG, A5_MAX_DEG);
     return clamped;
 }
 
@@ -51,9 +51,9 @@ eKinematicStatus SolveIK(const drivePosition& targetPos, AxelPostion& axelPos, d
     const double y = targetPos.Y - BASE_Y_CM;
     const double distance = std::sqrt(x * x + y * y);
 
-    // A3/A4 are pass-through axes; report them even if the planar solve fails.
-    axelPos.A3 = targetPos.LAO;
-    axelPos.A4 = targetPos.CRAN;
+    axelPos.A3 = 0.0;
+    axelPos.A4 = targetPos.LAO;
+    axelPos.A5 = targetPos.CRAN;
 
     if (distance > MAX_REACH_CM + tolerance) {
         axelPos.A1 = 0.0;
@@ -81,11 +81,13 @@ eKinematicStatus SolveIK(const drivePosition& targetPos, AxelPostion& axelPos, d
 
     axelPos.A1 = ToDegrees(a1);
     axelPos.A2 = ToDegrees(a2);
+    axelPos.A3 = -(axelPos.A1 + axelPos.A2);
 
     if (!WithinLimit(axelPos.A1, A1_MIN_DEG, A1_MAX_DEG, tolerance) ||
         !WithinLimit(axelPos.A2, A2_MIN_DEG, A2_MAX_DEG, tolerance) ||
         !WithinLimit(axelPos.A3, A3_MIN_DEG, A3_MAX_DEG, tolerance) ||
-        !WithinLimit(axelPos.A4, A4_MIN_DEG, A4_MAX_DEG, tolerance)) {
+        !WithinLimit(axelPos.A4, A4_MIN_DEG, A4_MAX_DEG, tolerance) ||
+        !WithinLimit(axelPos.A5, A5_MIN_DEG, A5_MAX_DEG, tolerance)) {
         return eKinematicStatus::JointLimit;
     }
 
@@ -107,8 +109,8 @@ drivePosition cDriveCalculator::CalculateForwardKinematics(const AxelPostion& ax
     drivePosition pos{};
     pos.X = BASE_X_CM + LINK1_LEN_CM * std::cos(a1) + LINK2_LEN_CM * std::cos(a12);
     pos.Y = BASE_Y_CM + LINK1_LEN_CM * std::sin(a1) + LINK2_LEN_CM * std::sin(a12);
-    pos.LAO = axelPos.A3;
-    pos.CRAN = axelPos.A4;
+    pos.LAO = axelPos.A4;
+    pos.CRAN = axelPos.A5;
     return pos;
 }
 

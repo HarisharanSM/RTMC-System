@@ -2,7 +2,7 @@
 
 **Real-Time Motion Control System Simulator for Precision Imaging Devices**
 
-RTMC-System is a C++17 simulator for a two-axis motion-control stack used in precision imaging equipment (the axis naming — `LAO/RAO`, `CRAN/CAUD`, `X/Y` — mirrors the positioning conventions of C-arm / angiography-style imaging gantries). It models the full signal path from operator input to actuator command — joystick input → CAN bus transport → drive kinematics — without requiring any physical PCAN hardware or motor hardware. A browser-based dual-joystick dashboard drives the pipeline over HTTP, standing in for a real hardware joystick and CAN interface.
+RTMC-System is a C++17 simulator for a five-axis motion-control stack used in precision imaging equipment (the axis naming — `LAO/RAO`, `CRAN/CAUD`, `X/Y` — mirrors the positioning conventions of C-arm / angiography-style imaging gantries). It models the full signal path from operator input to actuator command — joystick input → CAN bus transport → drive kinematics — without requiring any physical PCAN hardware or motor hardware. A browser-based dual-joystick dashboard drives the pipeline over HTTP, standing in for a real hardware joystick and CAN interface.
 
 ## How it works
 
@@ -26,11 +26,11 @@ PCAN layer — SetSpeed() / SetPosition()
         (logged to stdout in place of real CAN writes)
 ```
 
-Everything below the dashboard is simulated: the "PCAN" layer mimics the real PCANBasic SDK's types and constants but stubs the actual hardware calls with console logging, so the whole pipeline runs on a plain Linux machine with no CAN adapter attached.
+The dashboard displays the backend's simulated commanded pose. Everything below the dashboard is simulated: the "PCAN" layer mimics the real PCANBasic SDK's types and constants but stubs the actual hardware calls with console logging, so the whole pipeline runs on a plain Linux machine with no CAN adapter attached.
 
 ## Architecture
 
-The system is built around three interfaces (`includes/iSystemController.h`, `iPCANController.h`, `iDrive.h`) that decouple orchestration from implementation, so the simulated CAN/drive layers could be swapped for real hardware without touching the composition logic in `main.cpp`.
+The system is built around motion and collision interfaces (`includes/iSystemController.h`, `iPCANController.h`, `iDrive.h`, `iCollisionSupervisor.h`) that decouple orchestration from implementation, so the simulated CAN/drive layers could be swapped for real hardware without touching the composition logic in `main.cpp`.
 
 | Module | Responsibility |
 |---|---|
@@ -77,13 +77,18 @@ geometry, asynchronous supervision, permit renewal and the protective-stop latch
 On startup, `pcan_demo`:
 1. Initializes the simulated PCAN controller and drive subsystem via `cControlManager`.
 2. Starts `cCANMocker`, which listens on **port 8082** for joystick commands from the UI.
-3. Launches `python3 -m http.server 8000` to serve `ui/index.html`, so `python3` must be on `PATH`.
+3. Serves the joystick console, 3D viewer and live telemetry from the same process on port 8082.
 
-Then open `http://localhost:8000` in a browser and use the on-screen joystick buttons to drive the simulated motion pipeline; system activity is logged to stdout in place of real CAN traffic.
+Then open `http://localhost:8082` in a browser and use the on-screen joystick buttons to drive the simulated motion pipeline; system activity is logged to stdout in place of real CAN traffic.
 
-> **Note:** the UI serving path in `main.cpp` is still repository-layout dependent.
-> The dashboard automatically selects `localhost:8082` for local use and rewrites
-> a forwarded `-8000.` host to `-8082.` for a devcontainer-style environment.
+The asset root is recorded by CMake. If relocating the executable, use
+`./pcan_demo --assets /absolute/path/to/RTMC-System`. The listener is loopback-only.
+Open the HTTP console for live movement; opening the generated viewer file is
+offline inspection. No separate Python server is needed.
+
+X/Y are fixed offsets from the initial patient-head position. A1/A2 retain the
+existing geometry; A3 automatically cancels their heading, A4 is LAO and A5 is
+CRAN. The console shows all five backend angles and avoidance state.
 
 ## Status
 
@@ -115,3 +120,17 @@ python3 tests/test_collision_reference.py
 
 See the [verification record](docs/collision-avoidance/verification.md) for completed
 checks and the distinction from future runtime/hardware acceptance tests.
+
+## Design implementation completion
+
+Run CTest with port 8082 free. The `runtime_avoidance` test (requires Python 3)
+launches the actual `pcan_demo`, verifies repeated permitted movement, stops on
+approach to the fixed pedestal with positive clearance, verifies the latched
+restart block and Stop acknowledgement, and tests lost-input watchdog stopping.
+
+```sh
+python3 tests/test_runtime.py --binary build/pcan_demo
+```
+
+The required completion checklist is [architecture section 17.5](docs/collision-avoidance/architecture.md#175-mandatory-design-implementation-completion-gate).
+The offline viewer and unit tests alone do not satisfy runtime acceptance.

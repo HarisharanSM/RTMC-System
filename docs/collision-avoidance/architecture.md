@@ -1,6 +1,6 @@
 # Predictive collision avoidance for RTMC-System
 
-Design revision 1 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
+Design revision 2 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
 
 **Deliverable status:** implementation architecture, a reproducible synthetic 3D reference dataset, and a C++ simulation implementation under `collision/`. The application now uses asynchronous preflight, predictive permits and a latched avoidance stop. This is not a released physical safety function: machine dimensions, calibration, measured feedback, backend command acknowledgement, dynamics and stopping performance remain unverified.
 
@@ -14,9 +14,9 @@ This version avoids collision by withholding movement and stopping. It does not 
 
 “Static” describes an object's world pose, not its mesh file. Robot geometry is normally rigid and preloaded but its pose is dynamic. A fixed table is static only while its installation and attachments remain unchanged. Patients, staff, drapes and loose cables cannot be assumed static during clinical motion. A synthetic patient box is a test obstacle, not a patient sensing system.
 
-## 2. Existing system and concrete integration gaps
+## 2. Original baseline and integration gaps
 
-The architecture follows the existing C++17 module boundaries instead of adopting the nine-axis mechanism of the reference product.
+The table records the original baseline; several software gaps are now implemented. Section 17 and implementation.md define the current five-axis simulator and mandatory completion gate. Hardware-only gaps remain open.
 
 | Existing location | Observed behavior | Required extension before avoidance can govern motion |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ The repository documents rotation about world Z. The new 3D world therefore uses
 | CA-05 | Hazard, stale result or unknown geometry revokes movement and initiates braking without waiting for controller Stop |
 | CA-06 | Protective stop remains latched until a Stop for the affected session and verified standstill; a new Start requires fresh preflight |
 | CA-07 | Late SAFE results, duplicate Start, held direction and old sessions cannot clear a stop latch |
-| CA-08 | All robot–environment and relevant robot–robot pairs are covered, including A3/A4 rotation with unchanged EOF X/Y |
+| CA-08 | All robot–environment and relevant robot–robot pairs are covered, including A4/A5 rotation with unchanged EOF X/Y |
 | CA-09 | Geometry/model changes invalidate permissions atomically; no object disappears during static/dynamic migration |
 | CA-10 | Missing feedback, invalid numbers, solver exhaustion, queue overflow and deadline failure never produce CLEAR |
 | CA-11 | Transport stop latency, queued commands, actuator response and stopping distance are included in the safety budget |
@@ -247,7 +247,7 @@ The backend must distinguish “stop request accepted,” “braking underway”
 
 ## 9. Timing and capacity design targets
 
-Initial simulation targets below are allocations to test, not hardware guarantees:
+The following are original future scheduling targets, not the implemented timing configuration. Revision 2 currently uses the 50 ms input cadence, 150 ms renewal deadline, and 250 ms conservative reaction allowance documented in section 17. The future allocations below require a dedicated periodic motion owner before they can be claimed:
 
 | Budget item | Candidate upper allocation |
 | --- | ---: |
@@ -270,9 +270,9 @@ The accompanying [data specification](data-specification.md) defines the deliver
 
 Use meters, radians and seconds internally. Legacy centimeters and degrees convert once at the adapter boundary. World frame W is right-handed with Z up, X along the declared EOF travel, Y across it. W=(0,0,0) is the floor point below the closed-pose EOF, not the base axle. The base's planar offset stays (-0.25,0) m.
 
-Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4 remain [-180,180] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are new explicit simulation assumptions. The C-arm transform is provisionally `Rz(A1+A2) * Ry(A3) * Rx(A4)` at the EOF X/Y and an assumed isocenter height. Actual LAO/CRAN axes and offsets are a release blocker, not inferred facts.
+Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4/A5 use [-180,180] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are new explicit simulation assumptions. The C-arm transform is provisionally `Rz(A1+A2+A3) * Ry(A4) * Rx(A5)`, with `A3=-(A1+A2)`, at the EOF X/Y and an assumed isocenter height. Actual LAO/CRAN axes and offsets are a release blocker, not inferred facts.
 
-ARTIS pheno contributes only the robotic C-arm reference concept, 1.30 m maximum source-to-image distance and 0.955 m usable clearance. Those are reference-product specifications, not complete collision geometry. The detector's published active field is not its external housing size. Our two-link/four-axis robot and fixed table deliberately differ from the manufacturer's mechanism and multi-tilt table. [Siemens ARTIS pheno specifications](https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno), [Siemens system overview](https://academy.siemens-healthineers.com/_/en-us/artis-pheno-system-overview-us/).
+ARTIS pheno contributes only the robotic C-arm reference concept, 1.30 m maximum source-to-image distance and 0.955 m usable clearance. Those are reference-product specifications, not complete collision geometry. The detector's published active field is not its external housing size. Our two-link/five-axis robot and fixed table deliberately differ from the manufacturer's mechanism and multi-tilt table. [Siemens ARTIS pheno specifications](https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno), [Siemens system overview](https://academy.siemens-healthineers.com/_/en-us/artis-pheno-system-overview-us/).
 
 No OEM CAD, manufacturer-specific enclosure accuracy, purchased table model or physical patient scan is claimed. The dataset is marked `simulation_only`; production loading must reject it regardless of whether an individual preview looks clear.
 
@@ -315,7 +315,7 @@ Existing `tests/test_kinematics.cpp` remains the planar regression suite. Add fu
 | AVOID-02 | Drive tick remains bounded while worker sleeps indefinitely; missing permission stops before certified expiry |
 | AVOID-03 | Next pose clear but brake trajectory intersects table: deny/stop before unsafe continuation |
 | AVOID-04 | Obstacle between clear endpoints: continuous check finds it |
-| AVOID-05 | Pure A3/A4 rotation, stationary EOF, detector rim approaches table: stop predicted |
+| AVOID-05 | Pure A4/A5 rotation, stationary EOF, detector rim approaches table: stop predicted |
 | AVOID-06 | A1/A2 elbow sweep hits obstacle while EOF remains clear: stop predicted |
 | AVOID-07 | Hazard clears while button held: no restart; Stop then fresh Start required |
 | AVOID-08 | Stop arrives during braking: acknowledgement remembered; still wait for measured standstill |
@@ -356,7 +356,7 @@ WP1 and WP2 can proceed independently; WP3 needs their contracts. WP4 integrates
 | --- | --- | --- |
 | EOF meaning | End effector, following repository kinematics document | Confirm actual attached assembly and relevant accessories |
 | Fixed patient table | Floor-fixed synthetic table; no table joints | Actual CAD, installed pose and deflection/load envelope |
-| A3/A4 transforms | Intrinsic Y then X after A1+A2 heading | Mechanical drawings, encoder sign/zero calibration |
+| A3/A4 transforms | Compensated Z heading, then intrinsic Y (A4) and X (A5) | Mechanical drawings, encoder sign/zero calibration |
 | Arm height separation | Two horizontal links at different heights | Physical link housings, bearings and joint geometry |
 | Actual braking | No released profile | Direction/load/configuration trials and worst-case latency |
 | Stop acknowledgement | Session Stop plus measured standstill | Controller protocol and required operator indication |
@@ -370,3 +370,189 @@ These unknowns do not prevent simulation implementation, but the software must e
 The algorithm and concurrency decisions above are engineering proposals, not requirements quoted from a standard. Applicable device risk management includes [ISO 14971:2019](https://www.iso.org/standard/72704.html). Medical electrical basic safety and essential performance are addressed by [IEC 60601-1](https://webstore.iec.ch/en/publication/67497); interventional X-ray equipment has particular requirements under [IEC 60601-2-43:2022, FDA recognition](https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfStandards/detail.cfm?standard__identification_no=44449). Software lifecycle planning should assess [IEC 62304](https://webstore.iec.ch/en/publication/6792) and applicable amendments/market recognition. Applicability, classification and residual risk require device-specific review; none of these sources certifies the proposed algorithm or synthetic model.
 
 Primary sources were consulted on 2026-09-14. Source product dimensions are distinguished from RTMC constants and synthetic assumptions in the data package. Manufacturer transport dimensions are not used as collision envelopes.
+
+## 17. Five-axis head reference and live runtime completion
+
+This section is the revision-2 implementation contract. The three requested
+improvements are complete only when coordinate, runtime, and display checks all
+pass against the same built application and generated scene.
+
+### 17.1 Fixed patient frame and pivot contract
+
+Define the patient frame once at startup. The head center is H=(0,0,1.20) m in
+the synthetic world. +X follows the fixed table from head toward feet, +Y is
+transverse, and +Z points upward. Legacy drive X/Y remain centimeters, reported
+as offsets from that fixed initial head projection; angles remain degrees at
+the drive interface. The head is not re-zeroed after motion or Stop.
+
+A1 and A2 retain their lengths, limits, positive-elbow IK branch, relative-A2
+convention, and base (-0.25,0) m. A3 is a rotary alignment joint at the end of
+link 2. Its Z axis is parallel to those of A1 and A2. Those three joints do
+not share one spatial center: making them concentric would change the existing
+2R mechanism. The A3 mount pivot is (F.x,F.y,0.68) m in this synthetic assembly.
+
+| Axle | Function | Command |
+| --- | --- | --- |
+| A1 | Base rotation around Z | Existing planar IK |
+| A2 | Relative elbow around Z | Existing planar IK |
+| A3 | Support/C-arm heading compensation around Z | -(A1+A2), automatically derived |
+| A4 | LAO/RAO about local Y at imaging center | Requested LAO |
+| A5 | CRAN/CAUD about subsequent local X at imaging center | Requested CRAN |
+
+The A4/A5 axis names and rotation order are explicit simulation conventions;
+physical anatomical signs and bearing offsets require mechanical confirmation.
+
+For angular values in radians and all positions in meters:
+
+```text
+E = (-0.25,0) + 0.75 * [cos(q1), sin(q1)]
+F = E + 1.00 * [cos(q1+q2), sin(q1+q2)]
+q3 = -(q1+q2)
+I = (F.x,F.y,1.20)
+T_support = Translation(F.x,F.y,0.68) * Rz(q1+q2+q3)
+T_carm = Translation(I) * Rz(q1+q2+q3) * Ry(q4) * Rx(q5)
+```
+
+Consequently Rz(q1+q2+q3)=identity in commanded motion. X/Y always follow the
+patient frame even after LAO/CRAN rotation. Pure A4/A5 changes preserve I.
+At X=Y=0, I=H. After translation, rotation is about the new imaging location,
+while the original head coordinate reference stays fixed.
+
+All five angles participate in per-tick rate and travel checks. A3 is not
+normalized with an angle wrap that could introduce a discontinuous command.
+CAN targets are 0x201=A1, 0x202=A2, 0x203=A3 alignment, 0x204=A4 LAO,
+0x205=A5 CRAN. This is a protocol revision: an old four-axis controller must
+not consume the new layout. There is still no physical multi-frame commit
+acknowledgement in the simulator.
+
+### 17.2 Geometry ownership and collision consequences
+
+The torso and the new head primitive are fixed obstacles. The patient head
+primitive is centered exactly at H; the table and mattress remain fixed.
+A3 rotates the support frame independently from link 2, so its rigid-body ID
+is `alignment`, not `link2`. The C-arm, detector and source share `carm`.
+
+Runtime and viewer apply the same five-angle transform. Swept bounds include
+interval bounds on planar joint excursions (including interior extrema), plus
+body-center offset and half-diagonal, ensuring a box centered on the pivot
+still has a nonzero rotational surface sweep. A4/A5 changes must trigger
+prediction even when X/Y do not change. A3 compensation does not remove A1/A2
+link motion from collision checks.
+
+The retained synthetic interface exclusions are link1/link2,
+link2/alignment, alignment/carm and legacy link2/carm. This accommodates the
+existing overlapping proxy housings; it is not a verified local contact-mask
+model. The scene has no independent bearing CAD. Measured geometry and reviewed
+local masks are required before claims about physical self-collision protection.
+
+### 17.3 Running application and display data flow
+
+```mermaid
+flowchart LR
+    UI[Joystick pointer input] -->|Ordered POST /command| HTTP[pcan_demo HTTP / CAN decoder]
+    HTTP --> Drive[Single command owner: drive controller]
+    Drive -->|Snapshot with five axles| Collision[Parallel prediction worker]
+    Collision -->|One-use finite permit| Drive
+    Collision -->|Sticky revocation| Monitor[Independent stop monitor]
+    Monitor -->|Zero speed and latch| Bus[Simulated CAN backend]
+    Drive -->|Five accepted axle targets| Bus
+    Bus -->|Mutex-protected GET /state snapshot| View[Live 3D view and status]
+    View --> UI
+```
+
+One `pcan_demo` process serves the dashboard, viewer and state API on
+`http://localhost:8082`. Startup fails if assets are absent, collision workers
+cannot initialize, or the server cannot bind. There is no detached Python web
+server or fixed devcontainer path. CMake records the source asset root; a
+relocated binary can use `--assets /absolute/path/to/RTMC-System`.
+
+The HTTP server owns command callbacks serially. The drive admits at most one movement per 50 ms, so a burst of packets cannot accelerate the simulated motion clock. Browser presses send Start
+with the actual selected direction; ordered continuation requests follow every
+50 ms. Release, pointer cancellation, window blur and explicit Stop send
+controller Stop. Polling `/state` never drives the system. Continuation messages
+are input-driven; a dedicated real-time servo loop remains future work.
+
+Telemetry contains five commanded axle angles, position sequence, speed,
+lifecycle state, reason, and clear-permit count. Pose values are simulated
+commanded state, not measured physical feedback. The live viewer polls every
+100 ms, disables offline controls, and shows the stationary head marker beside
+the moving imaging-center marker. On network loss it retains the last pose and
+marks it stale/disconnected. Browser colors identify geometry, not safety.
+
+### 17.4 Prediction and independent stop timing
+
+Start remains stationary pending a matching permit. Each accepted continuation
+consumes one session/sequence/scene-bound permit, commits one valid segment,
+and submits a new stopping-path request. Geometry never runs in the drive
+callback. A separate monitor polls revocation and renewal expiry every 1 ms.
+
+The current simulation sets both result/renewal deadline and permit lifetime
+to 150 ms. The monitor expires outstanding permission even if the browser sends
+no more callbacks. Collision revocation or timeout writes zero speed and
+latches avoidance. A later clear result, held input, or repeated Start cannot
+clear it. Only controller Stop acknowledges that session; a subsequent Start
+requires new preflight. Unknown geometry is also a denial.
+
+The reaction allowance is 250 ms, covering the 150 ms renewal deadline plus
+a 100 ms simulator dispatch/scheduling reserve. Host scheduling is not a hard
+real-time guarantee. With v=0.20 m/s, possible a=0.40 m/s², braking b=0.50 m/s²:
+
+```text
+v_brake = v + a*T = 0.30 m/s
+reaction_travel = v*T + 0.5*a*T² = 0.0625 m
+braking_travel = v_brake²/(2*b) = 0.0900 m
+total = 0.1525 m
+```
+
+The additional pair margin is 0.020 m. Angular prediction uses its own speed,
+acceleration and braking bounds. Without measured velocity the worker assumes
+configured maximum speed, so some tilt commands can be denied already at
+preflight even though their immediate first step would be clear. This is
+conservative simulation behavior; speed selection would need a permit that
+also constrains the drive's profile before enabling smaller guarded moves.
+
+### 17.5 Mandatory design implementation completion gate
+
+A library build or an offline animation alone does not satisfy this gate.
+Run the real `pcan_demo` through its HTTP/CAN/drive/worker path. Required evidence:
+
+| ID | Procedure | Pass criterion |
+| --- | --- | --- |
+| LIVE-01 | Build application and all tests; start with generated assets | Server ready, collision enabled, Disarmed, five axle values |
+| LIVE-02 | Compare head, home pivot and rotated home transforms | X=Y=0 imaging center coincides with head; A4/A5 keep pivot fixed |
+| LIVE-03 | Command X/Y through multiple poses | A1+A2+A3=0; X/Y remain in initial patient frame; all five rate limits hold |
+| LIVE-04 | Load joystick page and its embedded live view | Backend angles and lifecycle appear; offline pose inputs disabled |
+| LIVE-05 | Hold +X from home | Repeated real position commits and clear-permit increments; A3 visibly compensates |
+| LIVE-06 | Continue toward fixed table pedestal | Predictor latches before source contact; positive geometric clearance and zero speed |
+| LIVE-07 | Keep sending direction and repeat Start after latch | Position sequence cannot advance |
+| LIVE-08 | Send controller Stop, then fresh reverse Start | Stop returns Disarmed; safe reverse preflight permits movement |
+| LIVE-09 | Drop continuation traffic after moving | Independent renewal watchdog stops without another drive callback |
+| LIVE-10 | Disconnect/close UI | No synthetic display extrapolation; stale status shown; backend lease expires |
+| LIVE-11 | Stop process, missing assets, occupied port, worker startup failure | Clean shutdown or explicit failed startup; no unsupervised application mode |
+| LIVE-12 | Regenerate and compare models; run concurrency checks | No drift in generated files; head/alignment tests and sanitizers pass |
+
+Automated runtime acceptance is `tests/test_runtime.py --binary build/pcan_demo`,
+registered as CTest `runtime_avoidance` when Python 3 is available. It launches
+and terminates its own application, refuses to use an unrelated process on
+8082, verifies the HTTP viewer route, moves toward the pedestal, checks an
+analytic source-to-pedestal gap, exercises latch/acknowledgement/reverse behavior,
+and drops command traffic to test the independent watchdog. Browser rendering,
+pointer cancellation, and mechanical confirmation remain distinct checks.
+
+```sh
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+python3 tools/generate_collision_reference.py --check
+python3 tests/test_collision_reference.py
+python3 tests/test_runtime.py --binary build/pcan_demo
+# After tests release port 8082:
+./build/pcan_demo
+# Open http://localhost:8082 and verify live joystick + 3D behavior.
+```
+
+Record the built revision, test results, observed stop clearance, and browser
+inspection in verification.md. Do not mark implementation complete if runtime
+avoidance is disabled, telemetry is merely locally animated, or the real
+application cannot demonstrate the predictive stop and persistent latch.
+This software completion gate does not replace physical release gates G1–G5.

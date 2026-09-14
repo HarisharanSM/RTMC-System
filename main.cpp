@@ -1,36 +1,30 @@
 #include "SystemController/include/cControlManager.h"
 #include "CANMocker/include/cCANMocker.h"
-#include <memory>
 #include <iostream>
 #include <thread>
-#include <cstdlib>
-
-int main() {
-    std::cout << "=== Interface Isolated System Initialization Setup ===\n\n";
-
-    // 1. Instantiate the single high-level systems engine loop wrapper block
-    std::unique_ptr<iSystemController> motionEngine = std::make_unique<cControlManager>();
-
-    if (!motionEngine->InitializeSystem()) {
-        std::cerr << "Initialization failed.\n";
-        return -1;
+#include <csignal>
+#include <filesystem>
+#ifndef RTMC_SOURCE_DIR
+#define RTMC_SOURCE_DIR "."
+#endif
+namespace {
+volatile std::sig_atomic_t stopping=0;
+void OnSignal(int) {stopping=1;}
+}
+int main(int argc,char** argv) {
+    std::signal(SIGINT,OnSignal); std::signal(SIGTERM,OnSignal); std::signal(SIGPIPE,SIG_IGN);
+    const std::string root=argc==3 && std::string(argv[1])=="--assets"?argv[2]:RTMC_SOURCE_DIR;
+    if(!std::filesystem::exists(root+"/ui/index.html") ||
+       !std::filesystem::exists(root+"/data/collision/reference/generated/viewer.html")) {
+        std::cerr<<"Missing dashboard assets. Use --assets /path/to/RTMC-System\n"; return 1;
     }
-
-    std::cout << "[Main] Booting HTTP CAN Mocker Translation Engine...\n";
-    auto sharedPcan = motionEngine->GetCanController();
-    
-    auto canMocker = std::make_unique<cCANMocker>(sharedPcan);
-    canMocker->Start();
-
-    // 2. --- Launch Static HTML Web Server for Remote View Dashboard ---
-    std::cout << "[Main] Spinning up local UI asset dashboard directories...\n";
-    std::string uiServerCmd = "python3 -m http.server 8000 --directory /workspaces/RTMC-System/ui > /dev/null 2>&1 &";
-    std::system(uiServerCmd.c_str());
-
-    std::cout << "[Main] System online. Operational tracks routing cleanly via abstract layers.\n";
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::hours(24));
-    }
-    std::cout << "[Main] System offline.\n";
+    cControlManager engine;
+    if(!engine.InitializeSystem()) return 1;
+    cCANMocker server(engine.GetCanController(),root);
+    if(!server.Start()) {std::cerr<<"Unable to listen on localhost:8082\n"; return 1;}
+    std::cout<<"RTMC live joystick + 3D display: http://localhost:8082\n"
+               "Predictive collision supervision enabled. Five-axis simulation.\n";
+    while(!stopping) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    server.Stop();
     return 0;
 }

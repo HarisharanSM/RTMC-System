@@ -1,25 +1,29 @@
-# Design and reference-data verification
+# Design and implementation verification
 
-Date: 2026-09-14. Scope: C++ simulation collision module, drive integration, reproducible synthetic geometry, viewer and artifact checks. No hardware test or physical safety release is claimed.
+Date: 2026-09-14. Scope: C++ simulation collision module, five-axis drive
+integration, reproducible synthetic geometry, live joystick/viewer runtime and
+fail-closed startup checks. No hardware test or physical safety release is
+claimed.
 
 ## Completed checks
 
 | Check | Result | Meaning |
 | --- | --- | --- |
 | `python3 tools/generate_collision_reference.py --check` | 14 generated files reproduce exactly | Parameters, generator, viewer template and output manifest agree |
-| `python3 tests/test_collision_reference.py` | 10 tests passed | SI units, IDs, frames, home/extension FK, relative elbow convention, rigid transforms, pure rotational surface motion, reference gap/SID, sector enclosure, OBJ topology and hashes checked |
-| Existing C++ drive kinematics suite | 24/24 scenarios; 56/56 checks passed | Existing behavior remains covered; no collision-supervision coverage implied |
-| C++ collision suite | 30/30 checks passed | OBB geometry, stopping-path prediction, invalid inputs/settings, reference-scene timing, asynchronous worker, sticky stop and integrated preflight/renewal/latch behavior checked |
-| Address/undefined-behavior sanitizer build | 30/30 checks passed | No sanitizer finding in the collision suite |
-| Thread sanitizer build | 30/30 checks passed | No reported data race in worker, monitor, mailbox or drive integration tests |
-| Full simulator link | Passed with existing stub-related warnings | Drive, CAN, controller and collision modules link together under C++17 with threads |
-| Browser visual inspection | Model renders with table, segmented C-arm, arm links and patient fixture | Layout and visible geometry checked |
-| Browser Oblique preset | A1=-60°, A2=100°, A3=25°, A4=-15°; EOF display approximately (0.891,-0.007) m | Preset updates the articulated view and reported EOF |
+| `python3 tests/test_collision_reference.py` | 11 tests passed | SI units, IDs, frames, head origin, five-axis alignment, FK, rigid transforms, rotational sweep, reference gap/SID, enclosure, OBJ topology and hashes checked |
+| Fresh C++ drive kinematics suite | 24/24 scenarios; 56/56 checks passed | Existing planar behavior and five-axis rate/travel mapping remain covered |
+| Fresh C++ collision suite | 36 checks passed | OBB geometry, stopping prediction, invalid input/settings, head pivot, A3 compensation, A5 corner sweep, worker, sticky stop, preflight, renewal and latch behavior checked |
+| Fresh full simulator link | Passed with stub-related unused-parameter warnings | Drive, CAN, HTTP, controller and collision modules link together under C++17 with threads |
+| Fresh address/undefined-behavior sanitizer run | 36 checks passed | No address or undefined-behavior finding in the collision and integrated-drive suite; macOS leak detection is unavailable and was not claimed |
+| Fresh ThreadSanitizer run | 36 checks passed | No reported data race in the worker, stop monitor, mailbox or integrated drive tests |
+| Real `pcan_demo` runtime acceptance | Passed | Actual HTTP to CAN to drive to worker path moved, renewed permits, stopped predictively, held its latch, acknowledged Stop and allowed safe reverse |
+| Observed synthetic pedestal stop | 0.167 m source-to-pedestal clearance at X=1.143 m | Positive clearance remained when the predictive collision latch stopped commanded motion |
+| Fail-closed startup acceptance | Passed | Missing assets and occupied port return failure; SIGTERM performs supervised clean shutdown |
 
-Browser checks used a loopback static server serving only the generated directory.
-Direct `file://` navigation was blocked by the automated browser's URL policy,
-so direct-file opening was not browser-verified. The generated viewer embeds its
-data and has no external dependencies; users can open the HTML in their own browser.
+The live dashboard and generated viewer were fetched from the running application.
+The automated test confirms that the joystick page embeds `/viewer?live=1`, the
+viewer contains the patient-head marker, and telemetry reports five axles. Visual
+rendering and pointer-cancellation behavior remain manual browser checks.
 
 CMake was not on PATH in this session. The unchanged kinematics test target was built directly with the available C++ compiler using the same three sources as `CMakeLists.txt`:
 
@@ -31,13 +35,22 @@ c++ -std=c++17 -Wall -Wextra -Iincludes -Idrive/include \
 /tmp/rtmc-reference-check.IlbziY/rtmc_tests
 ```
 
-The temporary path above records this run, not a required project directory. The collision suite, application, address/undefined-behavior sanitizer build and thread sanitizer build were likewise compiled directly as C++17 binaries. Normal project validation remains the CMake/CTest procedure in the root README.
+The 2026-09-14 completion run used a fresh temporary directory and rebuilt the
+kinematics suite, collision suite, and `pcan_demo` directly from the current
+sources. It then ran `tests/test_runtime.py` against that fresh application
+binary. The temporary binaries are not project artifacts. Normal project
+validation remains the CMake/CTest procedure in the root README.
+
+Fresh address/undefined-behavior and thread-sanitized collision executables were
+also compiled from the current sources and passed all 36 checks. The Apple
+AddressSanitizer runtime reports that leak detection is unsupported on this
+platform, so leak checking remains a release-toolchain task.
 
 ## What is not established
 
 - A physical no-contact stopping guarantee: the worker operates on synthetic geometry and configured simulation braking bounds.
 - Target-hardware real-time timing, CAN delivery/commit semantics or independent watchdog behavior. The bounded SPSC mailbox and host timing test cover the current simulation implementation only.
-- Physical source/detector/arm/table enclosure accuracy, A3/A4 mechanical transforms, patient coverage or calibration uncertainty.
+- Physical source/detector/arm/table enclosure accuracy, A3/A4/A5 mechanical transforms, patient coverage or calibration uncertainty.
 - Guaranteed braking deceleration, jerk/response bounds, measured standstill, load effects or hardware safety acceptance.
 - Collision-free home/extended/oblique poses. The OBJ snapshots are visual fixtures, and simplified joint/support contacts require reviewed masks.
 

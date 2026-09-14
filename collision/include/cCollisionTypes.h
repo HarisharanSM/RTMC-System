@@ -94,7 +94,7 @@ struct CollisionPermit {
 };
 
 struct PredictionSettings {
-    double reactionTimeS = 0.080;
+    double reactionTimeS = 0.250; // Includes 150 ms renewal expiry and dispatch allowance.
     double maximumLinearSpeedMps = 0.20;
     double maximumLinearAccelerationMps2 = 0.40;
     double guaranteedLinearDecelerationMps2 = 0.50;

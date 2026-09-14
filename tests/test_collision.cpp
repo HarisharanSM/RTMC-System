@@ -124,13 +124,13 @@ void TestPrediction() {
     const CollisionPermit clear = clearPredictor.Predict(Request(clearScene, Direction(1, 0, 0, 0)));
     Check(clear.verdict == eCollisionVerdict::Clear,
           "far obstacle is clear through reaction and braking path");
-    Check(clear.predictedTravelM > .07 && clear.predictedTravelM < .08,
-          "prediction includes approximately 71 mm of worst-case linear travel");
+    Check(std::abs(clear.predictedTravelM - .1525) < 1e-10,
+          "prediction includes 152.5 mm of worst-case linear travel");
     CollisionRequest measured = Request(clearScene, Direction(1, 0, 0, 0));
     measured.velocityMeasured = true;
     measured.linearSpeedMps = 0.0;
     const CollisionPermit measuredPermit = clearPredictor.Predict(measured);
-    Check(measuredPermit.predictedTravelM > .002 && measuredPermit.predictedTravelM < .003,
+    Check(std::abs(measuredPermit.predictedTravelM - .0225) < 1e-10,
           "bounded measured speed is used when feedback is explicitly marked measured");
 
     const auto hazardScene = ProbeScene({.145, 0, 1.2}, {.02, .40, .40});
@@ -277,6 +277,51 @@ void TestReferenceDriveIntegration() {
     drive.StopDrive(Direction(0, 0, 0, 0));
 }
 
+void TestFiveAxisHeadFrame() {
+    cDriveCalculator calculator;
+    cBodyKinematics kinematics;
+    bool aligned = true, roundTrip = true;
+    for (const drivePosition pose : {drivePosition{0,0,0,0}, {50,10,25,-15}, {100,-20,-30,20}}) {
+        AxelPostion q{};
+        aligned &= calculator.CalculateInverseKinematics(pose,q) == eKinematicStatus::Ok;
+        aligned &= std::abs(q.A1+q.A2+q.A3) < 1e-10;
+        roundTrip &= q.A4 == pose.LAO && q.A5 == pose.CRAN;
+        const auto f=calculator.CalculateForwardKinematics(q);
+        roundTrip &= std::abs(f.X-pose.X)<1e-9 && std::abs(f.Y-pose.Y)<1e-9 &&
+                     f.LAO==pose.LAO && f.CRAN==pose.CRAN;
+    }
+    Check(aligned, "A3 compensates A1+A2 throughout patient-frame translation");
+    Check(roundTrip, "five-axis IK/FK preserves X/Y and maps LAO=A4, CRAN=A5");
+    const auto home=kinematics.CalculateFrames({-180,180,0,0,0});
+    const auto tilted=kinematics.CalculateFrames({-180,180,0,25,-15});
+    const auto h=home[static_cast<int>(eBodyFrame::CArm)];
+    const auto t=tilted[static_cast<int>(eBodyFrame::CArm)];
+    Check(Norm(h.translation-Vec3{0,0,1.2})<1e-12 && Norm(t.translation-h.translation)<1e-12,
+          "LAO and CRAN rotate at the patient head without moving the home imaging center");
+    CollisionBody centered{"probe","probe",eBodyFrame::CArm,{0,0,0},{.6,.4,.3},0,false};
+    Check(kinematics.BoundBodyMotion(centered,{-180,180,0,0,0},{-180,180,0,0,30})>.1,
+          "A5 sweep bounds include box corners even when center is stationary");
+}
+
+void TestMissingRenewal() {
+    auto fake=std::make_shared<cFakePcanController>(); fake->Start();
+    auto scene=ProbeScene({1,0,1.2},{.05,.5,.5});
+    cDriveController drive(fake,std::make_unique<cCollisionSupervisor>(scene));
+    const auto direction=Direction(1,0,0,0);
+    drive.StartDrive(direction);
+    const auto until=std::chrono::steady_clock::now()+std::chrono::milliseconds(500);
+    while(fake->positionWrites==0 && std::chrono::steady_clock::now()<until) {
+        drive.HandleJoystick(direction); std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    Check(fake->positionWrites>0,"renewal watchdog fixture first obtains a movement permit");
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::milliseconds(500);
+    while(!drive.IsAvoidanceLatched() && std::chrono::steady_clock::now()<deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    Check(drive.IsAvoidanceLatched() && fake->speed.load()==0,
+          "missing callbacks expire permission and independently stop the running drive");
+    drive.StopDrive({0,0,0,0});
+}
+
 } // namespace
 
 int main() {
@@ -288,6 +333,8 @@ int main() {
     TestAsynchronousSupervisor();
     TestDriveIntegration();
     TestReferenceDriveIntegration();
+    TestFiveAxisHeadFrame();
+    TestMissingRenewal();
     std::cout << "\n" << (failures == 0 ? "all collision checks passed" :
                                            std::to_string(failures) + " collision checks failed") << "\n";
     return failures == 0 ? 0 : 1;

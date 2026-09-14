@@ -74,7 +74,7 @@ drivePosition Pos(double x, double y, double lao = 0.0, double cran = 0.0) {
 }
 
 bool AnyNaN(const AxelPostion& a) {
-    return std::isnan(a.A1) || std::isnan(a.A2) || std::isnan(a.A3) || std::isnan(a.A4);
+    return std::isnan(a.A1) || std::isnan(a.A2) || std::isnan(a.A3) || std::isnan(a.A4) || std::isnan(a.A5);
 }
 
 bool AnyNaN(const drivePosition& p) {
@@ -134,7 +134,7 @@ RunTrace Drive(cDriveCalculator& calc, drivePosition start, const joystickSignal
         const double jointStep = std::max(std::max(std::abs(nextAxel.A1 - currentAxel.A1),
                                                    std::abs(nextAxel.A2 - currentAxel.A2)),
                                           std::max(std::abs(nextAxel.A3 - currentAxel.A3),
-                                                   std::abs(nextAxel.A4 - currentAxel.A4)));
+                                                   std::max(std::abs(nextAxel.A4 - currentAxel.A4), std::abs(nextAxel.A5 - currentAxel.A5))));
         trace.maxJointStep = std::max(trace.maxJointStep, jointStep);
         trace.maxJointBudgetBreach = std::max(trace.maxJointBudgetBreach, jointStep - budget);
         trace.maxCartesianStep = std::max(trace.maxCartesianStep,
@@ -504,9 +504,9 @@ void UC6_AngularAxes() {
     cDriveCalculator lao;
     const RunTrace run = Drive(lao, Pos(100, 0), Sig(0, 0, 1, 0), 200);
     When("the final LAO is inspected");
-    Then(run.finalPos.LAO <= A3_MAX_DEG + 1e-9,
+    Then(run.finalPos.LAO <= A4_MAX_DEG + 1e-9,
          "LAO never exceeds +180 deg, no epsilon overshoot (got " + Num(run.finalPos.LAO, 9) + ")");
-    AndThen(Near(run.finalPos.LAO, A3_MAX_DEG, 1e-9),
+    AndThen(Near(run.finalPos.LAO, A4_MAX_DEG, 1e-9),
             "LAO saturates exactly at its limit rather than stalling early");
     EndScenario();
 }

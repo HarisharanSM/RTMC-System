@@ -35,6 +35,8 @@ private:
     std::atomic<std::uint64_t> m_Session{0};
     std::uint64_t m_CollisionSequence = 0;
     std::chrono::steady_clock::time_point m_PermitDeadline{};
+    std::chrono::steady_clock::time_point m_NextMotionAt{};
+    std::atomic<std::int64_t> m_MonitorDeadlineNs{0};
     std::atomic<bool> m_SafetyMonitorRunning{false};
     std::thread m_SafetyMonitor;
     std::mutex m_CommandMutex;

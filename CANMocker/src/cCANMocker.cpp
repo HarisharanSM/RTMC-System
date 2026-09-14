@@ -1,152 +1,103 @@
-#include "../include/cCANMocker.h"
-#include "../../PCAN/include/cPCANController.h"
+#include "cCANMocker.h"
+#include "cPCANController.h"
 #include <iostream>
-#include <chrono>
-#include <string>
+#include <fstream>
+#include <sstream>
 #include <map>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
-
-cCANMocker::cCANMocker(std::shared_ptr<iPCANController> pcanController)
-    : m_PcanController(pcanController), m_IsRunning(false) {}
-
-cCANMocker::~cCANMocker() {
-    Stop();
+namespace {
+std::string ReadAsset(const std::string& path) {
+    std::ifstream file(path); std::ostringstream contents; contents << file.rdbuf();
+    return contents.str();
 }
-
+void Respond(int client, int status, const std::string& type, const std::string& body) {
+    const std::string data = "HTTP/1.1 " + std::to_string(status) +
+        (status == 200 ? " OK\r\n" : " Error\r\n") +
+        "Content-Type: " + type + "\r\nCache-Control: no-store\r\nContent-Length: " +
+        std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n" + body;
+    std::size_t offset=0;
+    while(offset<data.size()) {
+        const auto count=send(client,data.data()+offset,data.size()-offset,0);
+        if(count<=0) break;
+        offset+=static_cast<std::size_t>(count);
+    }
+}
+}
+cCANMocker::cCANMocker(std::shared_ptr<iPCANController> controller, std::string root)
+    : m_PcanController(std::move(controller)), m_AssetRoot(std::move(root)) {}
+cCANMocker::~cCANMocker() { Stop(); }
 bool cCANMocker::Start() {
-    if (m_IsRunning) return true;
-    if (!m_PcanController) return false;
-
-    m_IsRunning = true;
-    m_WorkerThread = std::thread(&cCANMocker::MockingLoop, this);
-    std::cout << "[cCANMocker] Background bus node simulation initialized.\n";
+    if(m_IsRunning) return true;
+    if(!m_PcanController) return false;
+    m_ServerFd=socket(AF_INET,SOCK_STREAM,0);
+    if(m_ServerFd<0) return false;
+    int enabled=1;
+    setsockopt(m_ServerFd,SOL_SOCKET,SO_REUSEADDR,&enabled,sizeof(enabled));
+    sockaddr_in address{};
+    address.sin_family=AF_INET;
+    address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    address.sin_port=htons(8082);
+    if(bind(m_ServerFd,reinterpret_cast<sockaddr*>(&address),sizeof(address))<0 ||
+       listen(m_ServerFd,16)<0) {
+        close(m_ServerFd); m_ServerFd=-1; return false;
+    }
+    m_IsRunning=true;
+    try {m_WorkerThread=std::thread(&cCANMocker::MockingLoop,this);}
+    catch(...) {m_IsRunning=false; close(m_ServerFd); m_ServerFd=-1; return false;}
     return true;
 }
-
 void cCANMocker::Stop() {
-    if (m_IsRunning) {
-        m_IsRunning = false;
-        if (m_WorkerThread.joinable()) m_WorkerThread.join();
-        std::cout << "[cCANMocker] Bus simulation offline.\n";
-    }
+    if(!m_IsRunning.exchange(false)) return;
+    shutdown(m_ServerFd,SHUT_RDWR);
+    if(m_WorkerThread.joinable()) m_WorkerThread.join();
+    close(m_ServerFd); m_ServerFd=-1;
 }
-
 void cCANMocker::MockingLoop() {
-    std::map<std::string, int> bitShiftMap = {
-        {"R-up",    0}, {"R-down",  1}, {"R-left",  2}, {"R-right", 3},
-        {"L-up",    4}, {"L-down",  5}, {"L-left",  6}, {"L-right", 7}
-    };
-
-    int serverFd = socket(AF_INET, SOCK_STREAM, 0);
-    int opt = 1;
-    setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8082);
-
-    if (bind(serverFd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "[cCANMocker] Socket bind failed!\n";
-        return;
-    }
-    listen(serverFd, 5);
-
-    std::cout << "[cCANMocker] Bitmask Translator Core Active on Port 8082...\n";
-
-    while (m_IsRunning) {
-        int clientSocket = accept(serverFd, nullptr, nullptr);
-        if (clientSocket < 0) continue;
-
-        char buffer[1024] = {0};
-        int bytesRead = read(clientSocket, buffer, 1024);
-        
-        if (bytesRead > 0) {
-            std::string request(buffer);
-            size_t cmdPos = request.find("cmd=");
-            size_t btnPos = request.find("btn=");
-            
-            TPCANMsg frame{};
-            frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
-            frame.LEN = 1;
-            bool processFrame = false;
-
-            BYTE requestedDirection = 0;
-            if (btnPos != std::string::npos) {
-                std::string subStr = request.substr(btnPos + 4);
-                size_t spacePos = subStr.find(" ");
-                size_t ampPos = subStr.find("&");
-                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
-                std::string buttonId = (cutPos != std::string::npos) ? subStr.substr(0, cutPos) : subStr;
-                if (!buttonId.empty() && buttonId.back() == '\r') buttonId.pop_back();
-                auto matchIt = bitShiftMap.find(buttonId);
-                if (matchIt != bitShiftMap.end()) {
-                    requestedDirection = static_cast<BYTE>(1 << matchIt->second);
-                }
-            }
-
-            // Check if it's a lifecycle command (start/stop)
-            if (cmdPos != std::string::npos) {
-                std::string cmdSubStr = request.substr(cmdPos + 4);
-                size_t spacePos = cmdSubStr.find(" ");
-                size_t ampPos = cmdSubStr.find("&");
-                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
-                std::string cmdType = (cutPos != std::string::npos) ? cmdSubStr.substr(0, cutPos) : cmdSubStr;
-
-                if (cmdType.find("start") == 0) {
-                    frame.ID = 0x002; // StartDrive
-                    frame.DATA[0] = requestedDirection;
-                    processFrame = requestedDirection != 0;
-                    std::cout << "[cCANMocker] Internal Command -> Generated StartDrive (0x002) with direction 0x"
-                              << std::hex << static_cast<int>(requestedDirection) << std::dec << "\n";
-                } else if (cmdType.find("stop") == 0) {
-                    frame.ID = 0x003; // StopDrive
-                    frame.DATA[0] = 0x00;
-                    processFrame = true;
-                    std::cout << "[cCANMocker] Internal Command -> Generated StopDrive (0x003)\n";
-                }
-            }
-            // Fallback: regular continuous signal processing loop
-            else if (btnPos != std::string::npos) {
-                std::string subStr = request.substr(btnPos + 4);
-                size_t spacePos = subStr.find(" ");
-                size_t ampPos = subStr.find("&");
-                size_t cutPos = (ampPos < spacePos) ? ampPos : spacePos;
-                std::string buttonId = (cutPos != std::string::npos) ? subStr.substr(0, cutPos) : subStr;
-                
-                if (!buttonId.empty() && buttonId.back() == '\r') buttonId.pop_back();
-
-                auto matchIt = bitShiftMap.find(buttonId);
-                if (matchIt != bitShiftMap.end()) {
-                    BYTE bitmaskPayload = static_cast<BYTE>(1 << matchIt->second);
-                    frame.ID = 0x001; // HandleJoystick
-                    frame.DATA[0] = bitmaskPayload;
-                    processFrame = true;
-                    std::cout << "[cCANMocker] Event '" << buttonId << "' -> Bitmask: 0x" 
-                              << std::hex << (int)bitmaskPayload << std::dec << "\n";
-                }
-            }
-
-            if (processFrame) {
-                auto concreteController = std::dynamic_pointer_cast<cPCANController>(m_PcanController);
-                if (concreteController) {
-                    concreteController->InjectReceivedMessage(frame);
-                } else {
-                    std::cerr << "[cCANMocker] Error: Controller instance is invalid.\n";
-                }
+    const std::map<std::string,int> buttons{
+        {"R-up",0},{"R-down",1},{"R-left",2},{"R-right",3},
+        {"L-up",4},{"L-down",5},{"L-left",6},{"L-right",7}};
+    auto controller=std::dynamic_pointer_cast<cPCANController>(m_PcanController);
+    while(m_IsRunning) {
+        const int client=accept(m_ServerFd,nullptr,nullptr);
+        if(client<0) continue;
+        timeval timeout{0,200000};
+        setsockopt(client,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));
+        setsockopt(client,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout));
+        char buffer[4096];
+        const auto count=recv(client,buffer,sizeof(buffer),0);
+        if(count<=0) {close(client); continue;}
+        std::istringstream first(std::string(buffer,static_cast<std::size_t>(count)));
+        std::string method,target; first>>method>>target;
+        const auto query=target.find('?');
+        const std::string path=target.substr(0,query);
+        std::map<std::string,std::string> args;
+        if(query!=std::string::npos) {
+            std::istringstream fields(target.substr(query+1)); std::string field;
+            while(std::getline(fields,field,'&')) {
+                const auto equals=field.find('=');
+                if(equals!=std::string::npos) args[field.substr(0,equals)]=field.substr(equals+1);
             }
         }
-
-        std::string response = 
-            "HTTP/1.1 200 OK\r\n"
-            "Access-Control-Allow-Origin: *\r\n"
-            "Content-Length: 0\r\n"
-            "Connection: close\r\n\r\n";
-        write(clientSocket, response.c_str(), response.length());
-        close(clientSocket);
+        if(path=="/state" && method=="GET" && controller) {
+            Respond(client,200,"application/json",controller->TelemetryJson());
+        } else if(path=="/command" && method=="POST" && controller) {
+            TPCANMsg frame{}; frame.MSGTYPE=PCAN_MESSAGE_STANDARD; frame.LEN=1;
+            const auto button=buttons.find(args["btn"]);
+            bool valid=true;
+            if(args["cmd"]=="stop") frame.ID=0x003;
+            else if(button!=buttons.end() && (args["cmd"]=="start" || args["cmd"].empty())) {
+                frame.ID=args["cmd"]=="start"?0x002:0x001;
+                frame.DATA[0]=static_cast<BYTE>(1u<<button->second);
+            } else valid=false;
+            if(valid) controller->InjectReceivedMessage(frame);
+            Respond(client,valid?200:400,"application/json",valid?"{\"accepted\":true}":"{\"accepted\":false}");
+        } else if(method=="GET" && (path=="/" || path=="/index.html" || path=="/viewer")) {
+            const auto body=ReadAsset(m_AssetRoot+(path=="/viewer"?
+                "/data/collision/reference/generated/viewer.html":"/ui/index.html"));
+            Respond(client,body.empty()?404:200,"text/html; charset=utf-8",body);
+        } else Respond(client,404,"text/plain","Not found");
+        close(client);
     }
-
-    close(serverFd);
 }

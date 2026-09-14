@@ -12,6 +12,7 @@ namespace RTMCCollision {
 
 class cCollisionSupervisor : public iCollisionSupervisor {
 public:
+    const char* StopReason() const override { return m_StopReason.load(std::memory_order_acquire); }
     explicit cCollisionSupervisor(cSceneRegistry scene,
                                   PredictionSettings settings = PredictionSettings{});
     ~cCollisionSupervisor() override;
@@ -27,6 +28,7 @@ public:
     std::uint64_t SceneGeneration() const override;
 
 private:
+    std::atomic<const char*> m_StopReason{"Collision worker revoked motion"};
     void WorkerLoop();
     void RequestStop(std::uint64_t session);
 

@@ -4,9 +4,16 @@
 #include "cPCANReceiver.h"
 #include "cCANDriveHandler.h"
 #include <map>
+#include <mutex>
+#include <string>
 
 class cPCANController : public iPCANController {
 private:
+    mutable std::mutex m_TelemetryMutex;
+    AxelPostion m_Axles{-180,180,0,0,0};
+    float m_Speed = 0;
+    std::uint64_t m_PositionSequence = 0, m_ClearPermits = 0;
+    std::string m_State = "Disarmed", m_Reason = "Ready for preflight";
     TPCANHandle m_Channel;
     DWORD m_BaudRate;
     bool m_IsRunning;
@@ -28,7 +35,10 @@ public:
     bool SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, const BYTE* data) override;
     void InjectReceivedMessage(const TPCANMsg& msg);
 
-    // ✅ New Overrides for Hardware Operations
+    std::string TelemetryJson() const;
+    void PublishAvoidanceStatus(const char* state, const char* reason, bool clearPermit = false) override;
+
+    // Simulated hardware operations
     void SetSpeed(float speed) override;
     void SetPosition(const AxelPostion& position) override;
 };

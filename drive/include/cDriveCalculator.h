@@ -38,6 +38,8 @@ inline constexpr double A3_MIN_DEG = -180.0;
 inline constexpr double A3_MAX_DEG =  180.0;
 inline constexpr double A4_MIN_DEG = -180.0;
 inline constexpr double A4_MAX_DEG =  180.0;
+inline constexpr double A5_MIN_DEG = -180.0;
+inline constexpr double A5_MAX_DEG =  180.0;
 
 // Declared safety envelope, kept consistent with the reach annulus: at Y = 0 the
 // arm reaches exactly BASE_X + MAX_REACH = 150 cm.

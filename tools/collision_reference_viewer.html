@@ -29,24 +29,25 @@
   @media(max-width:800px) { main { grid-template-columns: 1fr; } aside { border-left: 0; } canvas,.stage { height: 520px; min-height: 520px; } }
 </style>
 <header>
-  <div class="eyebrow">RTMC / engineering reference / revision 1</div>
+  <div class="eyebrow">RTMC / engineering reference / revision 2</div>
   <h1>Predictive avoidance · 3D geometry</h1>
-  <p>Existing two-link positioner, pheno-inspired C-arm and fixed patient table.</p>
+  <p>Patient-head origin · A3 alignment · A4 LAO / A5 CRAN.</p>
 </header>
 <main>
   <div class="stage">
     <canvas id="view" aria-label="Interactive three dimensional reference model"></canvas>
     <div class="note">Drag to orbit · scroll to zoom · meters / Z up</div>
-    <div class="footer">Geometry preview only. Colors do not indicate clearance. No collision or braking algorithm runs in this viewer.</div>
+    <div class="footer">Offline preview. Open the live joystick console at localhost:8082 to run supervised movement.</div>
   </div>
   <aside>
     <div class="warning">SIMULATION ONLY<br>Assumed housings and table dimensions. Not manufacturer CAD or measured machine geometry.</div>
-    <h2>Reference pose</h2>
+    <h2 id="mode">Reference pose</h2><div id="live-status"></div>
     <button data-pose="home">Closed</button><button data-pose="extended">Extended</button><button data-pose="oblique">Oblique</button>
     <label>A1 · base <output id="o0"></output><input id="q0" aria-label="A1 base angle" type="range" min="-180" max="10" step="1" value="-180"></label>
     <label>A2 · relative elbow <output id="o1"></output><input id="q1" aria-label="A2 relative elbow angle" type="range" min="0" max="180" step="1" value="180"></label>
-    <label>A3 · provisional LAO <output id="o2"></output><input id="q2" aria-label="A3 LAO angle" type="range" min="-180" max="180" step="1" value="0"></label>
-    <label>A4 · provisional CRAN <output id="o3"></output><input id="q3" aria-label="A4 CRAN angle" type="range" min="-180" max="180" step="1" value="0"></label>
+    <label>A3 · automatic alignment <output id="o2"></output><input id="q2" type="range" min="-180" max="180" step="any" value="0" disabled></label>
+    <label>A4 · LAO <output id="o3"></output><input id="q3" aria-label="A4 LAO angle" type="range" min="-180" max="180" step="any" value="0"></label>
+    <label>A5 · CRAN <output id="o4"></output><input id="q4" aria-label="A5 CRAN angle" type="range" min="-180" max="180" step="any" value="0"></label>
     <div id="position"></div>
     <h2>Geometry layers</h2>
     <div class="legend">
@@ -62,6 +63,8 @@
 <script>
 const DATA = __REFERENCE_DATA__;
 const P = DATA.parameters, scene = DATA.scene;
+const live = new URLSearchParams(location.search).get('live')==='1';
+let liveState=null;
 const canvas = document.getElementById('view'), ctx = canvas.getContext('2d');
 let yaw = -0.85, pitch = 0.48, zoom = 155, dragging = null;
 const identity = () => Array.from({length:4},(_,i)=>Array.from({length:4},(_,j)=>+(i===j)));
@@ -70,13 +73,13 @@ function tr(x,y,z) {let m=identity();m[0][3]=x;m[1][3]=y;m[2][3]=z;return m;}
 function rot(axis,a) {let m=identity(),[i,j]={x:[1,2],y:[2,0],z:[0,1]}[axis];m[i][i]=m[j][j]=Math.cos(a);m[i][j]=-Math.sin(a);m[j][i]=Math.sin(a);return m;}
 function point(m,p) {return [0,1,2].map(i=>m[i][3]+p.reduce((s,v,j)=>s+m[i][j]*v,0));}
 function frames(q) {
-  const k=P.kinematics,[a,b,c,d]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
+  const k=P.kinematics,[a,b,c,d,e5]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
   const e=[x+k.link1_m*Math.cos(a),y+k.link1_m*Math.sin(a)];
   const f=[e[0]+k.link2_m*Math.cos(a+b),e[1]+k.link2_m*Math.sin(a+b)];
-  const h=rot('z',a+b);
+  const h=rot('z',a+b), aligned=rot('z',a+b+c);
   return {world:identity(),link1:mul(tr(x,y,k.link1_center_z_m),rot('z',a)),
-    link2:mul(tr(...e,k.link2_center_z_m),h),eof_support:mul(tr(...f,k.link2_center_z_m),h),
-    carm:mul(mul(mul(tr(...f,k.isocenter_z_m),h),rot('y',c)),rot('x',d))};
+    link2:mul(tr(...e,k.link2_center_z_m),h),eof_support:mul(tr(...f,k.link2_center_z_m),aligned),
+    carm:mul(mul(mul(tr(...f,k.isocenter_z_m),aligned),rot('y',d)),rot('x',e5))};
 }
 function project(p,w,h) {
   const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw);
@@ -84,7 +87,7 @@ function project(p,w,h) {
   return [w/2+zoom*u,h/2-zoom*(z*Math.cos(pitch)-v*Math.sin(pitch)),v*Math.cos(pitch)+z*Math.sin(pitch)];
 }
 function color(body) {
-  if(body.id==='patient_test_envelope')return '#e1ae63';
+  if(body.rigid_body==='patient_fixture')return '#e1ae63';
   if(body.rigid_body==='fixed_table')return '#6389bd';
   if(body.frame==='carm')return '#c8d6e5';
   return '#48baa9';
@@ -92,21 +95,23 @@ function color(body) {
 function draw() {
   const r=canvas.getBoundingClientRect(),w=r.width,h=r.height,dpr=window.devicePixelRatio||1;
   canvas.width=w*dpr;canvas.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
-  const q=[0,1,2,3].map(i=>+document.getElementById('q'+i).value), f=frames(q);
-  q.forEach((v,i)=>document.getElementById('o'+i).value=v.toFixed(0)+'°');
+  const q=liveState?liveState.axles_deg:[0,1,2,3,4].map(i=>+document.getElementById('q'+i).value);
+  if(!liveState){q[2]=-q[0]-q[1];document.getElementById('q2').value=q[2];}
+  const f=frames(q);
+  q.forEach((v,i)=>document.getElementById('o'+i).value=v.toFixed(2)+'°');
   const eof=point(f.carm,[0,0,0]), env=P.kinematics.eof_envelope_xy_m;
   const inEnvelope=eof[0]>=env[0][0]-1e-9&&eof[0]<=env[0][1]+1e-9&&eof[1]>=env[1][0]-1e-9&&eof[1]<=env[1][1]+1e-9;
-  document.getElementById('position').textContent=`EOF X ${eof[0].toFixed(3)} m / Y ${eof[1].toFixed(3)} m · ${inEnvelope?'within':'outside'} command envelope. Clearance untested.`;
+  document.getElementById('position').textContent=`EOF X ${eof[0].toFixed(3)} m / Y ${eof[1].toFixed(3)} m · ${inEnvelope?'within':'outside'} command envelope. ${liveState?'Backend: '+liveState.state:'Clearance untested.'}`;
   function line(a,b,col) {const p=project(a,w,h),q=project(b,w,h);ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(...p.slice(0,2));ctx.lineTo(...q.slice(0,2));ctx.stroke();}
   ctx.lineWidth=1;
   for(let i=-3;i<=3;i+=.5){line([i,-2.5,0],[i,2.5,0],'#243246');line([-3,i,0],[3,i,0],'#243246');}
   const faces=[];
   for(const b of scene.bodies) {
-    if(b.id==='floor'||(b.id==='patient_test_envelope'&&!document.getElementById('patient').checked))continue;
+    if(b.id==='floor'||(b.rigid_body==='patient_fixture'&&!document.getElementById('patient').checked))continue;
     const m=mul(f[b.frame],mul(tr(...b.center_m),rot('x',b.rotation_x_rad)));
     const vertices=[];for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])vertices.push(project(point(m,[x*b.size_m[0]/2,y*b.size_m[1]/2,z*b.size_m[2]/2]),w,h));
     for(const face of [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]]) {
-      const pts=face.map(i=>vertices[i]);faces.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,col:color(b),patient:b.id==='patient_test_envelope'});
+      const pts=face.map(i=>vertices[i]);faces.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,col:color(b),patient:b.rigid_body==='patient_fixture'});
     }
   }
   faces.sort((a,b)=>a.depth-b.depth);
@@ -114,7 +119,12 @@ function draw() {
     ctx.beginPath();face.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
     ctx.globalAlpha=face.patient?.18:.86;ctx.fillStyle=face.col;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=face.patient?'#e1ae6388':'#0c142077';ctx.stroke();
   }
-  const center=project(eof,w,h);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(center[0],center[1],4,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('EOF / isocenter',center[0]+9,center[1]-9);
+  const mount=point(f.eof_support,[0,0,0]), marker=project(mount,w,h);
+  ctx.fillStyle='#5fdfc4';ctx.font='12px system-ui';ctx.fillText('A3',marker[0]+7,marker[1]+6);
+  const center=project(eof,w,h);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(center[0],center[1],4,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('Imaging center',center[0]+9,center[1]-9);
+  const head=project(P.patient_fixture.head_center_m,w,h);
+  ctx.strokeStyle='#ffd48c';ctx.beginPath();ctx.arc(head[0],head[1],9,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#ffd48c';ctx.fillText('Patient head · X=0 Y=0',head[0]+12,head[1]+18);
   for(const [end,name,col] of [[[.4,0,0],'X','#fc857f'],[[0,.4,0],'Y','#5fdfc4'],[[0,0,.4],'Z','#8eaeff']]) {line([0,0,0],end,col);const t=project(end,w,h);ctx.fillStyle=col;ctx.fillText(name,t[0]+3,t[1]-3);}
 }
 document.querySelectorAll('input').forEach(e=>e.addEventListener('input',draw));
@@ -125,5 +135,24 @@ canvas.onpointermove=e=>{if(!dragging)return;yaw+=(e.clientX-dragging[0])*.007;p
 canvas.onpointerup=canvas.onpointercancel=()=>{dragging=null;};
 canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(50,Math.min(380,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});
 window.addEventListener('resize',draw);draw();
+if(live) {
+ document.body.classList.add('live');
+ const css=document.createElement('style');
+ css.textContent='.live header,.live .warning,.live [data-pose],.live .legend,.live aside h2:not(#mode),.live aside label:has(#patient),.live #reset{display:none}.live main{min-height:470px;grid-template-columns:minmax(0,1fr) 255px}.live canvas,.live .stage{height:470px;min-height:470px}.live aside{padding:12px}.live label{margin:7px 0}.live h2{margin:0 0 8px}.live #live-status{font-size:12px;color:#5fdfc4}.live input[type=range]{height:12px}.live .footer{bottom:8px;font-size:10px}.live #position{font-size:11px}@media(max-width:650px){.live main{grid-template-columns:1fr}.live aside{display:none}}';
+ document.head.appendChild(css);
+ document.getElementById('mode').textContent='Live axle positions';
+ document.querySelectorAll('input[type=range],[data-pose]').forEach(e=>e.disabled=true);
+ document.querySelector('.footer').textContent='Backend commanded pose · collision supervision runs in pcan_demo · colors identify parts, not clearance.';
+ async function refresh() {
+  try {
+   const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});
+   if(!r.ok)throw Error();liveState=await r.json();
+   liveState.axles_deg.forEach((v,i)=>document.getElementById('q'+i).value=v);
+   document.getElementById('live-status').textContent=liveState.state+' · '+liveState.reason;
+   draw();
+  }catch(e){document.getElementById('live-status').textContent='Disconnected — last pose retained; status unknown';}
+  setTimeout(refresh,100);
+ }refresh();
+}
 </script>
 </html>

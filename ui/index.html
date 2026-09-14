@@ -1,140 +1,78 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTMC Dual-Joystick Console</title>
-    <style>
-        body {
-            margin: 0; padding: 0; height: 100vh;
-            background-color: #121212; color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex; justify-content: space-between; align-items: center; overflow: hidden;
-        }
-        .wrapper { display: flex; flex-direction: column; align-items: center; }
-        .wrapper-left { margin-left: 40px; }
-        .wrapper-right { margin-right: 40px; }
-        .container-title { font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; }
-        .left-title { color: #00adb5; }
-        .right-title { color: #ff5722; }
-        .control-container {
-            width: 220px; height: 220px; background-color: #1e1e1e; border: 2px solid #333; border-radius: 12px;
-            display: grid; grid-template-areas: ". up ." "left . right" ". down .";
-            grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; padding: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-        .left-pad { border-color: #00adb5; }
-        .right-pad { border-color: #ff5722; }
-        .btn {
-            background-color: #2d2d2d; border: 1px solid #444; color: white; font-size: 1.5rem; font-weight: bold;
-            border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center;
-            transition: all 0.1s ease; user-select: none;
-        }
-        .btn:hover { background-color: #3d3d3d; }
-        .btn:active { background-color: #00adb5; transform: scale(0.95); }
-        .right-pad .btn:active { background-color: #ff5722; }
-        .up { grid-area: up; } .down { grid-area: down; } .left { grid-area: left; } .right { grid-area: right; }
-        .center-status { text-align: center; font-size: 1.2rem; letter-spacing: 2px; color: #888; }
-    </style>
-</head>
-<body>
-
-    <div class="wrapper wrapper-left">
-        <div class="container-title left-title">LAO/RAO, CRAN/CAUD</div>
-        <div class="control-container left-pad">
-            <button class="btn up" data-btn="L-up">▲</button>
-            <button class="btn left" data-btn="L-left">◀</button>
-            <button class="btn right" data-btn="L-right">▶</button>
-            <button class="btn down" data-btn="L-down">▼</button>
-        </div>
-    </div>
-
-    <div class="center-status">
-        <h2>RTMC INTERFACE</h2>
-        <div style="color: #00adb5; font-size: 0.9rem;">● STREAM ACTIVE</div>
-    </div>
-
-    <div class="wrapper wrapper-right">
-        <div class="container-title right-title">X, Y</div>
-        <div class="control-container right-pad">
-            <button class="btn up" data-btn="R-up">▲</button>
-            <button class="btn left" data-btn="R-left">◀</button>
-            <button class="btn right" data-btn="R-right">▶</button>
-            <button class="btn down" data-btn="R-down">▼</button>
-        </div>
-    </div>
-
-    <script>
-        let holdInterval = null;
-        let initialDelayTimeout = null;
-
-        function transmitSignal(buttonId, cmdType = "") {
-            const backend = new URL(window.location.href);
-            backend.search = "";
-            backend.hash = "";
-            if (backend.hostname.includes("-8000.")) {
-                backend.hostname = backend.hostname.replace("-8000.", "-8082.");
-            } else {
-                backend.port = "8082";
-            }
-            
-            // Generate distinct, unambiguous endpoint paths
-            let targetAddress = `${backend.toString()}?btn=${encodeURIComponent(buttonId)}`;
-            if (cmdType !== "") {
-                targetAddress += `&cmd=${cmdType}`;
-            }
-
-            fetch(targetAddress, {
-                method: 'GET',
-                mode: 'cors'
-            }).catch(err => { /* Drop empty frame responses safely */ });
-        }
-
-        function setupButtonLifecycle(buttonEl) {
-            const buttonId = buttonEl.getAttribute('data-btn');
-            
-            const startAction = (e) => {
-                e.preventDefault();
-                if (holdInterval !== null || initialDelayTimeout !== null) return;
-
-                // 1. Instantly fire StartDrive message flag (0x002)
-                transmitSignal(buttonId, "start");
-
-                // 2. Queue up the continuous streaming loop sequence (0x001)
-                initialDelayTimeout = setTimeout(() => {
-                    holdInterval = setInterval(() => {
-                        transmitSignal(buttonId);
-                    }, 50);
-                }, 50);
-            };
-
-            const stopAction = () => {
-                if (initialDelayTimeout !== null) {
-                    clearTimeout(initialDelayTimeout);
-                    initialDelayTimeout = null;
-                }
-                if (holdInterval !== null) {
-                    clearInterval(holdInterval);
-                    holdInterval = null;
-                }
-                // 3. Fire StopDrive message flag (0x003)
-                transmitSignal("none", "stop");
-            };
-
-            // Dynamic pointer mappings
-            buttonEl.addEventListener('mousedown', startAction);
-            buttonEl.addEventListener('touchstart', startAction, { passive: false });
-            
-            buttonEl.addEventListener('mouseup', stopAction);
-            buttonEl.addEventListener('mouseleave', stopAction);
-            buttonEl.addEventListener('touchend', stopAction);
-        }
-
-        // Initialize listener attachments when page elements land
-        document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll('.btn').forEach(btn => {
-                setupButtonLifecycle(btn);
-            });
-        });
-    </script>
-</body>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RTMC · Live motion console</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0c1420;color:#edf2f7;font:15px system-ui}
+header{padding:18px 26px;border-bottom:1px solid #2b3749;display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}small{color:#a8b9ce}iframe{width:100%;height:475px;border:0}
+.controls{display:flex;justify-content:space-evenly;gap:20px;align-items:center;padding:18px;flex-wrap:wrap}
+.pad{display:grid;grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,45px);gap:6px}
+button{background:#22334a;border:1px solid #527087;color:white;border-radius:6px;cursor:pointer;touch-action:none}
+button:active{background:#267f77}h2{font-size:15px;text-align:center}
+#state{color:#5fdfc4}#reason{max-width:350px;line-height:1.5;font-size:13px}
+#stop{padding:12px 25px;border-color:#e39475}
+</style>
+<header><div><h1>RTMC · Live motion</h1><small>Patient-head coordinates · Five axes · Simulation</small></div>
+<span id="state">Connecting…</span></header>
+<iframe src="/viewer?live=1" title="Live 3D motion and patient reference"></iframe>
+<section class="controls">
+<div><h2>A4 LAO / A5 CRAN</h2><div class="pad">
+<span></span><button data-btn="L-up">CRAN +</button><span></span>
+<button data-btn="L-left">LAO +</button><span></span><button data-btn="L-right">LAO −</button>
+<span></span><button data-btn="L-down">CRAN −</button><span></span>
+</div></div>
+<div><p id="reason">Waiting for backend state.</p><button id="stop">Stop / acknowledge</button><p><small>Hold a direction to move. Release to stop.</small></p></div>
+<div><h2>X / Y from patient head</h2><div class="pad">
+<span></span><button data-btn="R-up">X + feet</button><span></span>
+<button data-btn="R-left">Y +</button><span></span><button data-btn="R-right">Y −</button>
+<span></span><button data-btn="R-down">X − head</button><span></span>
+</div></div>
+</section>
+<script>
+let active=null, generation=0;
+let chain=Promise.resolve();
+function send(btn,cmd="") {
+  // Serialize lifecycle requests; Stop must follow any already issued tick.
+  chain=chain.catch(()=>{}).then(async()=>{
+    const r=await fetch('/command?btn='+encodeURIComponent(btn)+'&cmd='+cmd,
+      {method:'POST',signal:AbortSignal.timeout(500)});
+    if(!r.ok)throw Error('Command rejected');
+  });return chain;
+}
+function stop() {active=null;++generation;send('none','stop').catch(()=>{});}
+async function start(e) {
+  e.preventDefault();if(active)return;
+  active=e.currentTarget.dataset.btn;const btn=active,epoch=++generation;
+  e.currentTarget.setPointerCapture(e.pointerId);
+  try {
+    await send(btn,'start');
+    while(active===btn && epoch===generation) {
+      await new Promise(r=>setTimeout(r,50));
+      if(active!==btn || epoch!==generation)break;
+      await send(btn);
+    }
+  } catch(err) {stop();}
+}
+document.querySelectorAll('[data-btn]').forEach(b=>{
+ b.onpointerdown=start;b.onpointerup=stop;b.onpointercancel=stop;
+ b.onlostpointercapture=()=>{if(active)stop();};
+});
+document.getElementById('stop').onclick=stop;
+window.addEventListener('blur',()=>{if(active)stop();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden && active)stop();});
+async function poll() {
+ try {
+  const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});
+  if(!r.ok)throw Error();const s=await r.json();
+  document.getElementById('state').textContent='Collision supervision · '+s.state;
+  document.getElementById('state').style.color=s.state.includes('Latched')?'#ffab89':'#5fdfc4';
+  document.getElementById('reason').textContent=s.reason+' · Clear permits: '+s.clear_permits;
+ } catch(e) {
+  document.getElementById('state').textContent='Disconnected · motion status unavailable';
+  if(active)stop();
+ }
+ setTimeout(poll,100);
+}poll();
+</script>
 </html>

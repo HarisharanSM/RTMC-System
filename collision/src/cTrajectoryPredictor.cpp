@@ -36,7 +36,7 @@ bool cTrajectoryPredictor::IsFinite(const CollisionRequest& request) const {
     const double values[] = {
         request.currentPosition.X, request.currentPosition.Y, request.currentPosition.LAO,
         request.currentPosition.CRAN, request.currentAxles.A1, request.currentAxles.A2,
-        request.currentAxles.A3, request.currentAxles.A4, request.direction.x,
+        request.currentAxles.A3, request.currentAxles.A4, request.currentAxles.A5, request.direction.x,
         request.direction.y, request.direction.LAO, request.direction.CRAN,
         request.linearSpeedMps, request.angularSpeedRadps
     };
@@ -132,6 +132,8 @@ bool cTrajectoryPredictor::ShouldCheckPair(const CollisionBody& lhs,
     // housing boxes. Other robot pairs remain active for self-collision.
     if (SamePair(lhs, rhs, "link1", "link2")) return false;
     if (SamePair(lhs, rhs, "link2", "carm")) return false;
+    if (SamePair(lhs, rhs, "link2", "alignment")) return false;
+    if (SamePair(lhs, rhs, "alignment", "carm")) return false;
     return true;
 }
 
@@ -194,6 +196,33 @@ cTrajectoryPredictor::eIntervalResult cTrajectoryPredictor::CheckPairInterval(
         result.reason = "predicted pose is outside the kinematic safety envelope";
         return eIntervalResult::Unknown;
     }
+    // Bound joint excursions across the entire Cartesian interval, not just
+    // endpoint differences: a joint can reverse while X or Y stays monotone.
+    // q1=atan2(y,x)-alpha(r), q2=acos(c(r)). For L2>L1 alpha and q2
+    // decrease with radius. Radius extrema include the segment's projection
+    // onto the base, while atan2 is monotone on this single-axis path (x>0).
+    const auto p0=PoseAt(request,linearTravelM,angularTravelRad,begin);
+    const auto p1=PoseAt(request,linearTravelM,angularTravelRad,end);
+    const double x0=p0.X-RTMCGeometry::BASE_X_CM, y0=p0.Y-RTMCGeometry::BASE_Y_CM;
+    const double x1=p1.X-RTMCGeometry::BASE_X_CM, y1=p1.Y-RTMCGeometry::BASE_Y_CM;
+    const double dx=x1-x0, dy=y1-y0, length2=dx*dx+dy*dy;
+    const double projection=length2>0 ? std::clamp(-(x0*dx+y0*dy)/length2,0.0,1.0) : 0.0;
+    const double rMin=std::hypot(x0+projection*dx,y0+projection*dy);
+    const double rMax=std::max(std::hypot(x0,y0),std::hypot(x1,y1));
+    const double l1=RTMCGeometry::LINK1_LEN_CM, l2=RTMCGeometry::LINK2_LEN_CM;
+    const auto alpha=[&](double r) {return std::acos(std::clamp((l1*l1+r*r-l2*l2)/(2*l1*r),-1.0,1.0))*180/PI;};
+    const auto elbow=[&](double r) {return std::acos(std::clamp((r*r-l1*l1-l2*l2)/(2*l1*l2),-1.0,1.0))*180/PI;};
+    const double theta0=std::atan2(y0,x0)*180/PI, theta1=std::atan2(y1,x1)*180/PI;
+    const double q1Min=std::min(theta0,theta1)-alpha(rMin);
+    const double q1Max=std::max(theta0,theta1)-alpha(rMax);
+    const double dq1=std::max(std::abs(q1Min-middleAxles.A1),std::abs(q1Max-middleAxles.A1));
+    const double dq2=std::max(std::abs(elbow(rMin)-middleAxles.A2),std::abs(elbow(rMax)-middleAxles.A2));
+    // Synthetic extremal angles are only fed to the displacement bound;
+    // geometry is evaluated at the real midpoint. A3 cancellation is exact.
+    beginAxles.A1=middleAxles.A1-dq1; endAxles.A1=middleAxles.A1+dq1;
+    beginAxles.A2=middleAxles.A2-dq2; endAxles.A2=middleAxles.A2+dq2;
+    beginAxles.A3=-(beginAxles.A1+beginAxles.A2);
+    endAxles.A3=-(endAxles.A1+endAxles.A2);
     const eIntervalResult pair = CheckPair(moving, other, beginAxles, middleAxles,
                                            endAxles, result);
     if (pair != eIntervalResult::Unknown) return pair;
@@ -223,19 +252,19 @@ CollisionPermit cTrajectoryPredictor::Predict(const CollisionRequest& request) c
     result.session = request.session;
     result.sequence = request.sequence;
     result.sceneGeneration = m_Scene.Generation();
-    result.expiresAt = std::chrono::steady_clock::now() +
-        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-            std::chrono::duration<double>(m_Settings.permitLifetimeS));
-
     if (!m_Scene.IsValid() || request.sceneGeneration != m_Scene.Generation()) {
         result.reason = "scene is invalid or its generation changed";
         return result;
     }
+
     if (!IsFinite(request) || !IsDirectionValid(request.direction) ||
         !AreSettingsValid()) {
         result.reason = "request or prediction settings are invalid";
         return result;
     }
+    result.expiresAt = std::chrono::steady_clock::now() +
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(m_Settings.permitLifetimeS));
 
     result.predictedTravelM = StoppingTravel(request.linearSpeedMps, request.velocityMeasured,
         m_Settings.maximumLinearSpeedMps, m_Settings.maximumLinearAccelerationMps2,

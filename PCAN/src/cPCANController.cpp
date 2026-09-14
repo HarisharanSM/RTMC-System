@@ -1,6 +1,8 @@
 #include "../include/cPCANController.h"
 #include <iostream>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 
 cPCANController::cPCANController(TPCANHandle channel, DWORD baudRate)
     : m_Channel(channel), m_BaudRate(baudRate), m_IsRunning(false) {
@@ -53,6 +55,7 @@ void cPCANController::InjectReceivedMessage(const TPCANMsg& msg) {
 
 void cPCANController::SetSpeed(float speed) {
     if (!m_IsRunning) return;
+    { std::lock_guard<std::mutex> lock(m_TelemetryMutex); m_Speed = speed; }
 
     BYTE dataPayload[8] = {0};
     
@@ -69,8 +72,8 @@ void cPCANController::SetSpeed(float speed) {
 void cPCANController::SetPosition(const AxelPostion& position) {
     if (!m_IsRunning) return;
 
-    // A standard CAN frame holds up to 8 bytes. Since AxelPostion contains 4 double-precision fields 
-    // (4 * 8 bytes = 32 bytes), we serialize these across 4 distinct standard CAN frames.
+    { std::lock_guard<std::mutex> lock(m_TelemetryMutex); m_Axles = position; ++m_PositionSequence; }
+    // Five double positions, one standard frame per axle.
     
     BYTE frameData[8] = {0};
 
@@ -90,5 +93,23 @@ void cPCANController::SetPosition(const AxelPostion& position) {
     std::memcpy(frameData, &position.A4, sizeof(double));
     SendMessage(0x204, PCAN_MESSAGE_STANDARD, 8, frameData);
 
-    std::cout << "[cPCANController] Hardware CMD -> Synchronized 4-Axis Position Frames to Bus Topology.\n";
+    std::memcpy(frameData, &position.A5, sizeof(double));
+    SendMessage(0x205, PCAN_MESSAGE_STANDARD, 8, frameData);
+    std::cout << "[cPCANController] Hardware CMD -> Five axis position frames sent.\n";
+}
+void cPCANController::PublishAvoidanceStatus(const char* state, const char* reason, bool clearPermit) {
+    std::lock_guard<std::mutex> lock(m_TelemetryMutex);
+    m_State = state; m_Reason = reason;
+    if (clearPermit) ++m_ClearPermits;
+}
+std::string cPCANController::TelemetryJson() const {
+    std::lock_guard<std::mutex> lock(m_TelemetryMutex);
+    std::ostringstream out;
+    out << std::setprecision(15) << "{\"simulation_only\":true,\"collision_enabled\":true,\"state\":"
+        << std::quoted(m_State) << ",\"reason\":" << std::quoted(m_Reason)
+        << ",\"speed_dps\":" << m_Speed << ",\"sequence\":" << m_PositionSequence
+        << ",\"clear_permits\":" << m_ClearPermits << ",\"axles_deg\":["
+        << m_Axles.A1 << ',' << m_Axles.A2 << ',' << m_Axles.A3 << ','
+        << m_Axles.A4 << ',' << m_Axles.A5 << "]}";
+    return out.str();
 }

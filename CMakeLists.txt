@@ -37,6 +37,7 @@ add_executable(pcan_demo
     ${COLLISION_SOURCES}
 )
 target_link_libraries(pcan_demo PRIVATE Threads::Threads)
+target_compile_definitions(pcan_demo PRIVATE RTMC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 # --- Tests -----------------------------------------------------------------
 enable_testing()
@@ -48,6 +49,7 @@ add_executable(rtmc_tests
 )
 
 add_test(NAME kinematics COMMAND rtmc_tests)
+target_link_libraries(rtmc_tests PRIVATE Threads::Threads)
 
 add_executable(collision_tests
     tests/test_collision.cpp
@@ -59,3 +61,11 @@ add_executable(collision_tests
 target_link_libraries(collision_tests PRIVATE Threads::Threads)
 
 add_test(NAME collision_avoidance COMMAND collision_tests)
+
+# Runtime acceptance launches the real application and owns localhost:8082.
+find_program(RTMC_PYTHON_EXECUTABLE NAMES python3)
+if(RTMC_PYTHON_EXECUTABLE)
+    add_test(NAME runtime_avoidance COMMAND ${RTMC_PYTHON_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_runtime.py --binary $<TARGET_FILE:pcan_demo>)
+    set_tests_properties(runtime_avoidance PROPERTIES RUN_SERIAL TRUE TIMEOUT 40)
+endif()

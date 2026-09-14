@@ -4,20 +4,20 @@
     "frames/eof_support.obj": "2afc2a41ed908a6bef43ce07b29f8380b7fbb1358529279f6d394e07fac68ba7",
     "frames/link1.obj": "ba2b0b6a9444aa9f922f95b06ca38010644af96b2aa6f1bff1a3b947642c6a51",
     "frames/link2.obj": "15b3a647d726e2f2137a0a3b6e5510ca3de35a25374b2d47e636b959f7317dc9",
-    "frames/world.obj": "15c6d91b806e4313af01f27346b5c692314734a091a6e20f6978e03c9ea4eee2",
-    "poses/extended.json": "e179c39f44cab750d1867fc56476f220f9da80412a5478c8355e54993cdda197",
-    "poses/extended.obj": "5a7b7b932015343ee2ff9dfe18c6992bf5184b1bfd4cad658136ee71866c5d6e",
-    "poses/home.json": "60cd91cd8bf8867f1e63242e90b91cff5de8dfa5006b3125754f5438c88e3ce7",
-    "poses/home.obj": "2789266447d110f90d8a6e3a8af4b2f212cd8ad26dc530e77aaea8a58b242740",
-    "poses/oblique.json": "2212c886b145243dd6c081d4c4fa589633fbf37b45592b4a31866ef732a4969e",
-    "poses/oblique.obj": "dd94281e733b523aa03cf7b137a3ad89a7bbaecefb614982ed877189a57b7eac",
-    "scene.json": "94516ad4c2110c890d5e4fd5e80e7858baabe25f89d09c0521a52086f65df4d4",
-    "viewer.html": "f87f5d07b235d74b47348469e7afcbf67a946186f9c061c090abc92f796bdce9"
+    "frames/world.obj": "10636c99ee99e1b771e5245795b4fd43eeec452e0cfe5e7af0c0418caac6f7bb",
+    "poses/extended.json": "0e038fc0b811af94baceac564cbc07b9e58892557f538b2cbbda982c2c1eee02",
+    "poses/extended.obj": "12e0afa426661f3153cf38a7cbdeaa03d8c0a2dd36e6c7ba26fbce889a6c4ab8",
+    "poses/home.json": "fc41a7d870fa08842d769d20ed2625ce9f7a539ca269ef60ebc0bb191365127c",
+    "poses/home.obj": "3ca33bf6699c32cb1eae1d85146e712da843b085fe8776cc4887522ab97240b0",
+    "poses/oblique.json": "b6c25128a8f0432da297cf117f24eaba378550eff2e66787b4e6faad6f189e38",
+    "poses/oblique.obj": "190241f2db5b2fff690aa1e521c0e278533ebee590661f66bddbeb0e541c3096",
+    "scene.json": "41aec4afcf9bfd0d9048af661e93fc426bb2856e842e5d8cf92a3002b1abb33d",
+    "viewer.html": "fa487b5e9dbf0a6c8e84e4fbb8fa683b9be38991c3c4d97bc9434a48fe35e3c2"
   },
-  "generator_sha256": "db87f5ec45a9436abcf8765fabc878dc84b1bad4a290cd311da2904a2ac9a223",
+  "generator_sha256": "2d3c3bada08eb7ad649e191ff9375bc8c695f8ac6c2bb53e00d59ba50e65db22",
   "hardware_authorization": false,
-  "model_id": "rtmc-pheno-inspired-fixed-table-v1",
-  "parameter_sha256": "a150b91db25ede4e428aac38eb392698e55543e5b739617369133c19074cd2cf",
+  "model_id": "rtmc-head-aligned-five-axis-v2",
+  "parameter_sha256": "54f0bb559c26f3ed7f548c137124c7f121aa054861e56f457e07b7deb0640dd1",
   "status": "simulation_only",
-  "viewer_template_sha256": "abe957c8b655613bd8d3dabf7f116e350ec7216391c9044397809fadef5dca9d"
+  "viewer_template_sha256": "c301daf6bb30a6f3bc5dce41e6f11ac31c638f13ea0a74b2875018ea534d6dd1"
 }

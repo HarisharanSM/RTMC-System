@@ -30,9 +30,9 @@ cSceneRegistry cSceneRegistry::CreateReferenceScene(bool includePatientFixture) 
                       {0.75, 0, 0.125}, {0.24, 0.24, 0.25}));
     scene.AddBody(Box("link2_housing", "link2", eBodyFrame::Link2,
                       {0.50, 0, 0}, {1.00, 0.16, 0.14}));
-    scene.AddBody(Box("support_rear_beam", "link2", eBodyFrame::EofSupport,
+    scene.AddBody(Box("support_rear_beam", "alignment", eBodyFrame::EofSupport,
                       {0, -0.45, 0}, {0.16, 1.06, 0.16}));
-    scene.AddBody(Box("support_column", "link2", eBodyFrame::EofSupport,
+    scene.AddBody(Box("support_column", "alignment", eBodyFrame::EofSupport,
                       {0, -0.90, 0.26}, {0.16, 0.16, 0.52}));
 
     constexpr int segments = 24;
@@ -64,8 +64,10 @@ cSceneRegistry cSceneRegistry::CreateReferenceScene(bool includePatientFixture) 
     scene.AddBody(Box("mattress", "fixed_table", eBodyFrame::World,
                       {0.90, 0, 0.975}, {2.00, 0.53, 0.05}, 0, true));
     if (includePatientFixture) {
+        scene.AddBody(Box("patient_head", "patient_fixture", eBodyFrame::World,
+                          {0, 0, 1.20}, {0.24, 0.24, 0.24}, 0, true));
         scene.AddBody(Box("patient_test_envelope", "patient_fixture", eBodyFrame::World,
-                          {0.90, 0, 1.15}, {1.80, 0.50, 0.30}, 0, true));
+                          {0.96, 0, 1.15}, {1.68, 0.50, 0.30}, 0, true));
     }
     scene.AddBody(Box("floor", "floor", eBodyFrame::World,
                       {0.50, 0, -0.05}, {6.00, 5.00, 0.10}, 0, true));

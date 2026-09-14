@@ -17,4 +17,5 @@ public:
                             RTMCCollision::CollisionPermit& permit) = 0;
     virtual bool IsStopRequested(std::uint64_t session) const = 0;
     virtual std::uint64_t SceneGeneration() const = 0;
+    virtual const char* StopReason() const { return "Collision worker revoked motion"; }
 };

@@ -16,7 +16,7 @@ bool cDrive::Initialize(std::shared_ptr<iPCANController> pCANptr) {
     auto supervisor = std::make_unique<RTMCCollision::cCollisionSupervisor>(
         RTMCCollision::cSceneRegistry::CreateReferenceScene(true));
     m_Controller = std::make_unique<cDriveController>(pCANptr, std::move(supervisor));
-    return true;
+    return m_Controller->GetCurrentErrorCode() == 0;
 }
 
 void cDrive::HandleJoystick(const joystickSignal& signal) {

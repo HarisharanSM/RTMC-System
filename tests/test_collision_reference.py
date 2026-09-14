@@ -39,26 +39,26 @@ class ReferenceDataTests(unittest.TestCase):
         self.assertEqual(self.scene["pair_policy"]["adjacent_body_exclusions"], [])
 
     def test_planar_home_and_extension(self):
-        for q, expected in [([-180, 180, 0, 0], [0, 0, 1.2]), ([0, 0, 0, 0], [1.5, 0, 1.2])]:
+        for q, expected in [([-180, 180, 0, 0, 0], [0, 0, 1.2]), ([0, 0, 0, 0, 0], [1.5, 0, 1.2])]:
             actual = ref.transform(ref.frames(self.p, q)["carm"], [0, 0, 0])
             for x, y in zip(actual, expected):
                 self.assertAlmostEqual(x, y, places=12)
 
     def test_relative_elbow_and_link_end_agreement(self):
         for a1, a2 in itertools.product([-180, -90, -30, 0, 10], [0, 45, 90, 180]):
-            f = ref.frames(self.p, [a1, a2, 0, 0])
+            f = ref.frames(self.p, [a1, a2, -a1-a2, 0, 0])
             end = ref.transform(f["link2"], [1, 0, 0])
             eof = ref.transform(f["carm"], [0, 0, 0])
             self.assertAlmostEqual(end[0], eof[0], places=12)
             self.assertAlmostEqual(end[1], eof[1], places=12)
-        q = [-90, 90, 0, 0]
+        q = [-90, 90, 0, 0, 0]
         eof = ref.transform(ref.frames(self.p, q)["carm"], [0, 0, 0])
         self.assertAlmostEqual(eof[0], 0.75)
         self.assertAlmostEqual(eof[1], -0.75)
 
     def test_pure_rotation_moves_surface_not_eof(self):
-        a = ref.frames(self.p, [0, 0, 0, 0])["carm"]
-        b = ref.frames(self.p, [0, 0, 90, 0])["carm"]
+        a = ref.frames(self.p, [0, 0, 0, 0, 0])["carm"]
+        b = ref.frames(self.p, [0, 0, 0, 90, 0])["carm"]
         self.assertEqual(ref.transform(a, [0, 0, 0]), ref.transform(b, [0, 0, 0]))
         pa, pb = ref.transform(a, [0, 0, .8]), ref.transform(b, [0, 0, .8])
         self.assertAlmostEqual(math.sqrt(sum((x-y)**2 for x, y in zip(pa, pb))), math.sqrt(1.28))
@@ -70,6 +70,17 @@ class ReferenceDataTests(unittest.TestCase):
                     for j in range(3):
                         self.assertAlmostEqual(sum(m[k][i]*m[k][j] for k in range(3)), float(i == j), places=12)
                 self.assertEqual(m[3], [0, 0, 0, 1])
+
+    def test_head_origin_and_alignment(self):
+        head = next(b for b in self.scene['bodies'] if b['id'] == 'patient_head')
+        home = ref.frames(self.p, self.p['kinematics']['home_deg'])
+        for actual, expected in zip(ref.transform(home['carm'], [0,0,0]), head['center_m']):
+            self.assertAlmostEqual(actual, expected)
+        for a1,a2 in [(-180,180),(-90,120),(-30,60),(0,0)]:
+            frame=ref.frames(self.p,[a1,a2,-a1-a2,0,0])['carm']
+            for i in range(3):
+                for j in range(3):
+                    self.assertAlmostEqual(frame[i][j],float(i==j))
 
     def test_reference_gap_and_sid(self):
         r = self.p["robot"]

@@ -3,7 +3,7 @@
     {
       "center_m": [
         -0.25,
-        0.0,
+        0,
         0.175
       ],
       "collision_enabled": true,
@@ -75,7 +75,7 @@
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
-        1.0,
+        1,
         0.16,
         0.14
       ]
@@ -91,7 +91,7 @@
       "frame": "eof_support",
       "id": "support_rear_beam",
       "mobility": "articulated",
-      "rigid_body": "link2",
+      "rigid_body": "alignment",
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
@@ -111,7 +111,7 @@
       "frame": "eof_support",
       "id": "support_column",
       "mobility": "articulated",
-      "rigid_body": "link2",
+      "rigid_body": "alignment",
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
@@ -715,14 +715,14 @@
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
-        2.0,
+        2,
         0.53,
         0.05
       ]
     },
     {
       "center_m": [
-        0.9,
+        0.96,
         0,
         1.15
       ],
@@ -735,9 +735,29 @@
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
-        1.8,
+        1.68,
         0.5,
         0.3
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        1.2
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "patient_head",
+      "mobility": "static",
+      "rigid_body": "patient_fixture",
+      "rotation_x_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.24,
+        0.24
       ]
     },
     {
@@ -755,8 +775,8 @@
       "rotation_x_rad": 0.0,
       "shape": "box",
       "size_m": [
-        6.0,
-        5.0,
+        6,
+        5,
         0.1
       ]
     }
@@ -769,7 +789,7 @@
     "carm"
   ],
   "hardware_authorization": false,
-  "model_id": "rtmc-pheno-inspired-fixed-table-v1",
+  "model_id": "rtmc-head-aligned-five-axis-v2",
   "pair_margin_m": 0.02,
   "pair_policy": {
     "adjacent_body_exclusions": [],
@@ -777,7 +797,7 @@
     "note": "No blanket adjacent-link exclusions. Intended joints/floor support contacts require reviewed local contact masks before runtime use. Preview poses are not certified collision-free.",
     "same_rigid_body": "exclude internal primitive overlaps"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "simulation_only",
   "transform_layout": "row-major 4x4; column vectors; local point to world",
   "uncertainty_status": "unmeasured; margin is illustrative, not a physical bound",

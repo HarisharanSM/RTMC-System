@@ -1,25 +1,19 @@
 #pragma once
-#include "../../includes/iPCANController.h"
+#include "iPCANController.h"
 #include <thread>
 #include <atomic>
 #include <memory>
-
+#include <string>
 class cCANMocker {
-private:
     std::shared_ptr<iPCANController> m_PcanController;
     std::thread m_WorkerThread;
-    std::atomic<bool> m_IsRunning;
-
-    // Background function that cycles through telemetry values
+    std::atomic<bool> m_IsRunning{false};
+    int m_ServerFd = -1;
+    std::string m_AssetRoot;
     void MockingLoop();
-
 public:
-    cCANMocker(std::shared_ptr<iPCANController> pcanController);
+    explicit cCANMocker(std::shared_ptr<iPCANController> controller, std::string assetRoot = ".");
     ~cCANMocker();
-
-    // Starts the background thread pumping dummy traffic
     bool Start();
-    
-    // Safely halts the background simulator loop
     void Stop();
 };

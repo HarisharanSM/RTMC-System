@@ -96,7 +96,10 @@ void cCollisionSupervisor::WorkerLoop() {
 
         CollisionPermit result = m_Predictor.Predict(request);
         if (request.session != m_ActiveSession.load(std::memory_order_acquire)) continue;
-        if (result.verdict != eCollisionVerdict::Clear) RequestStop(request.session);
+        if (result.verdict != eCollisionVerdict::Clear) {
+            m_StopReason.store(result.reason, std::memory_order_release);
+            RequestStop(request.session);
+        }
         if (!m_Results.Push(result)) RequestStop(request.session);
     }
 }

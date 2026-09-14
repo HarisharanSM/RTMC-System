@@ -48,20 +48,21 @@ def transform(t, p):
 
 def frames(parameters, degrees):
     k = parameters["kinematics"]
-    a1, a2, a3, a4 = map(math.radians, degrees)
+    a1, a2, a3, a4, a5 = map(math.radians, degrees)
     bx, by = k["base_xy_m"]
     elbow = [bx + k["link1_m"] * math.cos(a1),
              by + k["link1_m"] * math.sin(a1)]
     eof = [elbow[0] + k["link2_m"] * math.cos(a1 + a2),
            elbow[1] + k["link2_m"] * math.sin(a1 + a2)]
     heading = rotation("z", a1 + a2)
+    aligned = rotation("z", a1 + a2 + a3)
     return {
         "world": identity(),
         "link1": multiply(translation(bx, by, k["link1_center_z_m"]), rotation("z", a1)),
         "link2": multiply(translation(*elbow, k["link2_center_z_m"]), heading),
-        "eof_support": multiply(translation(*eof, k["link2_center_z_m"]), heading),
+        "eof_support": multiply(translation(*eof, k["link2_center_z_m"]), aligned),
         "carm": multiply(multiply(multiply(translation(*eof, k["isocenter_z_m"]),
-                                             heading), rotation("y", a3)), rotation("x", a4)),
+                                             aligned), rotation("y", a4)), rotation("x", a5)),
     }
 
 
@@ -87,9 +88,9 @@ def build_scene(p):
     box("link2_housing", "link2", "link2", [k["link2_m"], *r["link2_cross_section_yz_m"]],
         [k["link2_m"] / 2, 0, 0])
     rear, width, height = r["support_rear_offset_m"], r["support_width_m"], r["support_height_m"]
-    box("support_rear_beam", "eof_support", "link2", [width, rear + width, height], [0, -rear / 2, 0])
+    box("support_rear_beam", "eof_support", "alignment", [width, rear + width, height], [0, -rear / 2, 0])
     rise = k["isocenter_z_m"] - k["link2_center_z_m"]
-    box("support_column", "eof_support", "link2", [width, width, rise], [0, -rear, rise / 2])
+    box("support_column", "eof_support", "alignment", [width, width, rise], [0, -rear, rise / 2])
 
     # Each OBB encloses one full annular sector: in its radial/tangent basis,
     # radial coordinate lies [inner*cos(h), outer] and tangent lies +/-outer*sin(h).
@@ -119,11 +120,13 @@ def build_scene(p):
     if p["patient_fixture"]["enabled"]:
         size = p["patient_fixture"]["size_m"]
         box("patient_test_envelope", "world", "patient_fixture", size,
-            [tx, ty, top + mattress_height + size[2] / 2])
+            p["patient_fixture"]["center_m"])
+        box("patient_head", "world", "patient_fixture", p["patient_fixture"]["head_size_m"],
+            p["patient_fixture"]["head_center_m"])
     size = p["environment"]["floor_size_m"]
     box("floor", "world", "floor", size, [0.5, 0, -size[2] / 2])
     return {
-        "schema_version": 1, "model_id": p["model_id"], "status": p["status"],
+        "schema_version": 2, "model_id": p["model_id"], "status": p["status"],
         "hardware_authorization": False, "units": p["units"],
         "transform_layout": "row-major 4x4; column vectors; local point to world",
         "frames": ["world", "link1", "link2", "eof_support", "carm"],

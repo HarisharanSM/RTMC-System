@@ -31,7 +31,6 @@ cDriveController::cDriveController(
     // Home is world (0,0) - the fully closed pose. Resolve it up front so the
     // reported axle angles match the reported position from the first tick.
     m_ptrCalculator->CalculateInverseKinematics(m_CurrentPosition, m_CurrentAxelPosition);
-
     if (m_CollisionSupervisor && !m_CollisionSupervisor->Start()) {
         m_CurrentErrorCode = 1001;
         m_LifecycleState.store(eLifecycleState::FaultLatched, std::memory_order_release);
@@ -83,8 +82,6 @@ void cDriveController::MonitorStop() {
             if (m_pCANController) m_pCANController->PublishAvoidanceStatus("AvoidanceLatched",
                 m_CollisionSupervisor->IsStopRequested(m_Session.load()) ?
                 m_CollisionSupervisor->StopReason() : "Collision permission renewal deadline expired");
-            std::cerr << "[cDriveController] Predictive avoidance monitor stopped the drive. "
-                         "Controller Stop is required before restart.\n";
             return;
         }
     }

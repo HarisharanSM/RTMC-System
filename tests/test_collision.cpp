@@ -115,6 +115,25 @@ void TestStartDirectionProtocol() {
             actual.CRAN == expected[bit].CRAN;
     }
     Check(allDirections, "all eight CAN bit directions decode to their actual requested axis/sign");
+    bool versionedDirections = true;
+    for (int index = 0; index < 8; ++index) {
+        TPCANMsg frame{};
+        frame.LEN = 8;
+        frame.DATA[0] = RTMC_CAN_PROTOCOL_VERSION;
+        frame.DATA[1] = static_cast<BYTE>(index + 1);
+        const joystickSignal actual = decoder.ConvertToJoystickSignal(frame);
+        versionedDirections = versionedDirections && actual.x == expected[index].x &&
+            actual.y == expected[index].y && actual.LAO == expected[index].LAO &&
+            actual.CRAN == expected[index].CRAN;
+    }
+    Check(versionedDirections, "revision-3 CAN direction enum preserves all eight joystick directions");
+    TPCANMsg incompatible{};
+    incompatible.LEN = 8;
+    incompatible.DATA[0] = RTMC_CAN_PROTOCOL_VERSION - 1;
+    incompatible.DATA[1] = 1;
+    const auto rejected = decoder.ConvertToJoystickSignal(incompatible);
+    Check(rejected.x == 0 && rejected.y == 0 && rejected.LAO == 0 && rejected.CRAN == 0,
+          "incompatible versioned UI frames cannot create motion");
 }
 
 void TestPrediction() {

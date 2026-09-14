@@ -24,6 +24,12 @@ void Respond(int client, int status, const std::string& type, const std::string&
         offset+=static_cast<std::size_t>(count);
     }
 }
+void WriteU16(BYTE* data, std::uint16_t value) {
+    data[0]=static_cast<BYTE>(value&0xffu); data[1]=static_cast<BYTE>((value>>8)&0xffu);
+}
+void WriteU32(BYTE* data, std::uint32_t value) {
+    for(int i=0;i<4;++i)data[i]=static_cast<BYTE>((value>>(8*i))&0xffu);
+}
 }
 cCANMocker::cCANMocker(std::shared_ptr<iPCANController> controller, std::string root)
     : m_PcanController(std::move(controller)), m_AssetRoot(std::move(root)) {}
@@ -83,20 +89,46 @@ void cCANMocker::MockingLoop() {
         if(path=="/state" && method=="GET" && controller) {
             Respond(client,200,"application/json",controller->TelemetryJson());
         } else if(path=="/command" && method=="POST" && controller) {
-            TPCANMsg frame{}; frame.MSGTYPE=PCAN_MESSAGE_STANDARD; frame.LEN=1;
+            TPCANMsg frame{}; frame.MSGTYPE=PCAN_MESSAGE_STANDARD; frame.LEN=8;
             const auto button=buttons.find(args["btn"]);
             bool valid=true;
-            if(args["cmd"]=="stop") frame.ID=0x003;
+            const bool start=args["cmd"]=="start";
+            const bool stop=args["cmd"]=="stop";
+            if(stop) frame.ID=STOP_DRIVE_MSG;
             else if(button!=buttons.end() && (args["cmd"]=="start" || args["cmd"].empty())) {
-                frame.ID=args["cmd"]=="start"?0x002:0x001;
-                frame.DATA[0]=static_cast<BYTE>(1u<<button->second);
+                frame.ID=start?START_DRIVE_MSG:DRIVE_MSG;
             } else valid=false;
-            if(valid) controller->InjectReceivedMessage(frame);
-            Respond(client,valid?200:400,"application/json",valid?"{\"accepted\":true}":"{\"accepted\":false}");
-        } else if(method=="GET" && (path=="/" || path=="/index.html" || path=="/viewer")) {
-            const auto body=ReadAsset(m_AssetRoot+(path=="/viewer"?
-                "/data/collision/reference/generated/viewer.html":"/ui/index.html"));
+            if(valid) {
+                if(start && m_SessionToken==0) {
+                    m_SessionToken=++m_NextSessionToken;
+                    if(m_SessionToken==0)m_SessionToken=++m_NextSessionToken;
+                }
+                frame.DATA[0]=RTMC_CAN_PROTOCOL_VERSION;
+                frame.DATA[1]=button==buttons.end()?0:static_cast<BYTE>(button->second+1);
+                ++m_InputSequence;if(m_InputSequence==0)++m_InputSequence;
+                WriteU16(frame.DATA+2,m_InputSequence);
+                WriteU32(frame.DATA+4,m_SessionToken);
+                controller->InjectReceivedMessage(frame);
+            }
+            std::ostringstream response;
+            response<<"{\"accepted\":"<<(valid?"true":"false")
+                    <<",\"protocol_version\":"<<RTMC_CAN_PROTOCOL_VERSION
+                    <<",\"input_sequence\":"<<m_InputSequence
+                    <<",\"session\":"<<m_SessionToken<<'}';
+            Respond(client,valid?200:400,"application/json",response.str());
+            if(valid && stop)m_SessionToken=0;
+        } else if(method=="GET" && (path=="/" || path=="/index.html")) {
+            const auto body=ReadAsset(m_AssetRoot+"/ui/index.html");
             Respond(client,body.empty()?404:200,"text/html; charset=utf-8",body);
+        } else if(method=="GET" && path=="/model/parameters.json") {
+            const auto body=ReadAsset(m_AssetRoot+"/data/collision/reference/parameters.json");
+            Respond(client,body.empty()?404:200,"application/json",body);
+        } else if(method=="GET" && path=="/model/scene.json") {
+            const auto body=ReadAsset(m_AssetRoot+"/data/collision/reference/generated/scene.json");
+            Respond(client,body.empty()?404:200,"application/json",body);
+        } else if(method=="GET" && path=="/model/manifest.json") {
+            const auto body=ReadAsset(m_AssetRoot+"/data/collision/reference/generated/manifest.json");
+            Respond(client,body.empty()?404:200,"application/json",body);
         } else Respond(client,404,"text/plain","Not found");
         close(client);
     }

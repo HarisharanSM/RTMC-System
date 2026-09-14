@@ -1,6 +1,13 @@
 # C++ collision module — implementation status
 
-Revision 2, 2026-09-14. This document records what the repository implements from the [architecture](architecture.md) and what remains dependent on physical machine evidence.
+Revision 3, 2026-09-14. This document records what the repository implements from the [architecture](architecture.md) and what remains dependent on physical machine evidence.
+
+The integrated `index.html` canvas and drive-originated CAN feedback workflow
+are implemented according to [architecture revision 3, section 18](architecture.md#18-integrated-joystick-c-arm-display-and-can-workflow).
+The runtime has no iframe. UI press/hold/Stop requests use revision-3 CAN fields;
+drive commits are encoded as five fixed-point angle frames, speed and a commit
+marker. Only a complete matching sequence updates the pose returned by `/state`.
+An unchanged-pose CAN heartbeat keeps feedback age meaningful while stationary.
 
 ## Implemented path
 
@@ -23,8 +30,11 @@ The worker returns a finite permit with session, request sequence, scene generat
 | `collision/src/cTrajectoryPredictor.cpp` | Braking travel, kinematic clipping and conservative interval certification |
 | `collision/src/cCollisionSupervisor.cpp` | Worker lifecycle, mailboxes, session filtering and sticky stop request |
 | `drive/src/cDriveController.cpp` | Preflight/running/latch states, 1 ms stop monitor and final permit gate |
-| `CANMocker/src/cCANMocker.cpp` | Preserves selected direction in Start frames |
+| `PCAN/src/cPCANController.cpp` | Revision-3 input decoding, fixed-point drive feedback, coherent assembly and heartbeat |
+| `CANMocker/src/cCANMocker.cpp` | Versioned press/hold/Stop CAN frames, integrated page/model routes and state API |
+| `ui/index.html` | Integrated model canvas, joystick lifecycle, five-axis CAN feedback and stale-state handling |
 | `tests/test_collision.cpp` | Geometry, future-path, worker and integrated lifecycle tests |
+| `tests/test_runtime.py` | Real executable, integrated page, CAN command/feedback, watchdog and predictive stop acceptance |
 
 The scene is compiled from the same numerical assumptions as `data/collision/reference/parameters.json`; the checked-in JSON/OBJ files remain inspection assets. Future measured models should be generated into a typed scene artifact or loaded through a validated parser so data and runtime constants cannot drift. Current artifact tests and collision tests independently check their respective representations but do not yet compare every compiled body field to generated scene JSON.
 
@@ -36,9 +46,9 @@ The application callback cadence remains input-driven at 50 ms. A permit lives f
 
 ## Known limits before physical use
 
-- Position and velocity are commanded simulation state; there is no coherent measured feedback, sample age, tracking error or measured standstill.
+- Position and velocity are coherent, sequenced commanded feedback with sample age; there is no encoder measurement, tracking error or measured standstill.
 - `SetSpeed(0)` is the only backend stop action and has no delivery, braking or standstill acknowledgement.
-- The motion backend sends five independent CAN position frames without atomic sequence/commit semantics.
+- Actuator targets still lack a physical multi-axis commit acknowledgement. The simulator's UI feedback uses five sequenced angle frames, speed and an atomic commit marker.
 - Stopping travel uses configured scalar bounds and assumes monotonic movement along the requested command coordinate. Coordinated asynchronous physical axle braking remains unmodeled.
 - The broad phase is pair-level separating-axis rejection for the current small scene. A static BVH/dynamic tree is still needed if measured scene density makes brute-force pair enumeration miss its deadline.
 - Version one accepts one active axis direction. A direction change invokes a stop and requires Stop plus a new Start.
@@ -52,26 +62,29 @@ The collision test executable covers rotated OBB overlap, future obstacle detect
 
 See [verification.md](verification.md) for current commands and results. Hardware release still requires architecture gates G1–G5 and AVOID-20 evidence.
 
-## Revision 2: head frame, alignment and live integration
+## Revision 3: head frame and integrated CAN display
 
 The fixed patient head center is (0,0,1.20) m, with a distinct static head proxy.
 A1/A2 keep the original planar solve. A3=-(A1+A2) holds support/C-arm heading
 constant in the patient frame; A4=LAO and A5=CRAN rotate about the current imaging
 center. All five joints participate in the movement budget and CAN target layout.
 
-`pcan_demo` serves the joystick console and live viewer at localhost:8082.
-The viewer consumes backend commanded axle state rather than animating local
-inputs. It displays head and imaging-center markers, alignment angle, lifecycle,
-reason and permit count. Manual pose changes remain available only offline.
-Startup validates assets, worker initialization and socket binding.
+`pcan_demo` serves one joystick and C-arm canvas page at localhost:8082. The
+canvas loads the generated scene and consumes only coherent drive CAN feedback;
+it does not animate input or use an iframe. It displays head and imaging-center
+markers, all five angles, lifecycle, reason, permit count and feedback age.
+Manual pose changes remain available only in the offline generated viewer.
+Startup validates the page/model assets, worker initialization and socket binding.
 
 Collision calculations include five-axis transforms and box-corner sweep radii.
-A telemetry mutex protects pose/status snapshots. The final command gate and
+A telemetry mutex and serialized feedback transmitter protect pose/status
+assembly. Five fixed-point angle frames, speed and a matching commit are required
+before a new display pose is published. The final command gate and
 independent monitor coordinate their outputs; a late Running transition cannot
 overwrite the sticky avoidance lifecycle. A3 support is grouped separately from
 link 2; synthetic interface exclusions remain an explicit limitation.
 
-The mandatory completion checklist is architecture section 17.5. CTest includes
+The mandatory completion checklists are architecture sections 17.5 and 18.12. CTest includes
 `runtime_avoidance` when Python is installed. It tests the real executable,
 including predictive pedestal stopping and persistent latch, rather than only
 the collision library. See verification.md for actual results.

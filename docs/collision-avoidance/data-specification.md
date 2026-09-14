@@ -131,8 +131,9 @@ Home F=(0,0) therefore places the imaging pivot at the head center rather than
 at an arbitrary table-side offset. Both references remain visible in the viewer
 after translation: the head stays fixed and the imaging center moves.
 
-The generated viewer remains an offline inspection artifact by default. When
-served by `pcan_demo` at `/viewer?live=1`, it disables manual poses and renders
-backend `axles_deg=[A1,A2,A3,A4,A5]` from `GET /state`. The joystick console
-embeds that view. Loss of telemetry retains the last pose and displays
-Disconnected; it never extrapolates motion or labels cached data as current.
+The generated viewer remains an offline inspection artifact. The running
+`pcan_demo` loads `parameters.json` and generated `scene.json` into the canvas
+inside `ui/index.html`; there is no iframe or separate live viewer. The canvas
+renders only complete drive-originated CAN feedback
+`axles_deg=[A1,A2,A3,A4,A5]` from `GET /state`. Loss or stale feedback retains
+the last complete pose, inhibits Start and never extrapolates motion.

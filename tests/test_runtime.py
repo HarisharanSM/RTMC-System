@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the actual simulator HTTP/CAN/drive/avoidance stack. No physical hardware."""
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -22,7 +23,9 @@ def command(button, kind=""):
     request = urllib.request.Request(URL + "/command?btn=" + button + "&cmd=" + kind,
                                      method="POST")
     with urllib.request.urlopen(request, timeout=2) as reply:
-        assert json.load(reply)["accepted"]
+        response=json.load(reply)
+        assert response["accepted"]
+        return response
 
 def x_m(s):
     q = list(map(math.radians, s["axles_deg"]))
@@ -63,6 +66,7 @@ def run(binary):
                                "Missing dashboard assets",
                                "missing assets prevent an unsupervised startup")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
+        occupied.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         occupied.bind(("127.0.0.1", 8082))
         occupied.listen(1)
         expect_startup_failure(binary, ["--assets", str(ROOT)],
@@ -85,29 +89,59 @@ def run(binary):
             else:
                 raise RuntimeError("Simulator did not start")
             check(initial["state"]=="Disarmed" and initial["collision_enabled"] and
-                  len(initial["axles_deg"])==5, "startup has collision supervision and five axle telemetry")
+                  len(initial["axles_deg"])==5 and initial["protocol_version"]==3,
+                  "startup has collision supervision and revision-3 five-axis telemetry")
+            check(initial["feedback_valid"] and initial["pose_source"]=="drive_can_feedback" and
+                  initial["pose_sequence"]==initial["sequence"] and initial["can_feedback_frames"]>=7,
+                  "home pose is assembled from a complete drive-originated CAN sample")
             with urllib.request.urlopen(URL) as reply:
-                check(b'/viewer?live=1' in reply.read(), "joystick dashboard embeds live 3D display")
-            with urllib.request.urlopen(URL+"/viewer?live=1") as reply:
-                check(b'Patient head' in reply.read(), "viewer includes patient-head coordinate marker")
+                dashboard=reply.read()
+                check(b'<canvas id="carm-view"' in dashboard and b'<iframe' not in dashboard and
+                      b"drive_can_feedback" in dashboard,
+                      "index contains the CAN-driven C-arm canvas without an iframe")
+            with urllib.request.urlopen(URL+"/model/parameters.json") as reply:
+                model=json.load(reply)
+                check(model["kinematics"]["home_deg"]==[-180,180,0,0,0],
+                      "integrated renderer receives the five-axis head-aligned model")
+            with urllib.request.urlopen(URL+"/model/scene.json") as reply:
+                scene_bytes=reply.read()
+                check(len(json.loads(scene_bytes)["bodies"])>5,
+                      "integrated renderer receives generated scene geometry")
+            with urllib.request.urlopen(URL+"/model/manifest.json") as reply:
+                manifest=json.load(reply)
+                check(hashlib.sha256(scene_bytes).hexdigest()==manifest["files"]["scene.json"] and
+                      model["model_id"]==manifest["model_id"],
+                      "integrated renderer assets agree with the generated manifest")
+            initial_sequence=initial["sequence"]
             # A lost browser/joystick stream must stop without any more drive calls.
-            command("R-up","start")
+            first_start=command("R-up","start")
+            check(first_start["protocol_version"]==3 and first_start["session"]>0 and
+                  first_start["input_sequence"]>0,
+                  "UI press is encoded with revision, sequence and session")
+            last_input_sequence=first_start["input_sequence"]
             for _ in range(10):
-                time.sleep(.05); command("R-up")
-                if state()["sequence"] > 0:
+                time.sleep(.05); held=command("R-up")
+                assert held["session"]==first_start["session"] and held["input_sequence"]>last_input_sequence
+                last_input_sequence=held["input_sequence"]
+                if state()["sequence"] > initial_sequence:
                     break
-            check(state()["sequence"]>0, "clear preflight permits actual movement")
+            moved=state()
+            check(moved["sequence"]>initial_sequence and moved["feedback_valid"] and
+                  moved["can_feedback_frames"]>initial["can_feedback_frames"],
+                  "clear preflight commits movement and returns it through CAN feedback")
             watchdog=wait_for(lambda s:s["state"]=="AvoidanceLatched")
             check(watchdog["speed_dps"]==0 and "deadline" in watchdog["reason"],
                   "independent watchdog stops on missing renewal")
             command("none","stop")
             check(state()["state"]=="Disarmed", "controller Stop acknowledges watchdog latch")
-            command("R-up","start")
+            second_start=command("R-up","start")
+            check(second_start["session"]!=first_start["session"],
+                  "Stop retires the input session and fresh press allocates another")
             for _ in range(400):
                 time.sleep(.05); command("R-up")
                 current=state()
                 q=current["axles_deg"]
-                assert abs(q[0]+q[1]+q[2])<1e-8, "A3 alignment drift"
+                assert abs(q[0]+q[1]+q[2])<=3e-4, "A3 alignment exceeds CAN quantization bound"
                 if current["state"]=="AvoidanceLatched":
                     break
             else:
@@ -127,7 +161,9 @@ def run(binary):
             check(state()["sequence"]==sequence, "held input and duplicate Start cannot restart collision latch")
             command("none","stop")
             check(state()["state"]=="Disarmed", "controller Stop acknowledges collision latch")
-            command("R-down","start")
+            reverse_start=command("R-down","start")
+            check(reverse_start["session"]!=second_start["session"],
+                  "reverse begins in a fresh controller input session")
             for _ in range(10):
                 time.sleep(.05); command("R-down")
                 if state()["sequence"]>sequence:

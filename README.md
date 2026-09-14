@@ -77,18 +77,21 @@ geometry, asynchronous supervision, permit renewal and the protective-stop latch
 On startup, `pcan_demo`:
 1. Initializes the simulated PCAN controller and drive subsystem via `cControlManager`.
 2. Starts `cCANMocker`, which listens on **port 8082** for joystick commands from the UI.
-3. Serves the joystick console, 3D viewer and live telemetry from the same process on port 8082.
+3. Serves one integrated joystick/C-arm canvas and live telemetry from the same process on port 8082.
 
 Then open `http://localhost:8082` in a browser and use the on-screen joystick buttons to drive the simulated motion pipeline; system activity is logged to stdout in place of real CAN traffic.
 
 The asset root is recorded by CMake. If relocating the executable, use
 `./pcan_demo --assets /absolute/path/to/RTMC-System`. The listener is loopback-only.
-Open the HTTP console for live movement; opening the generated viewer file is
+The runtime page renders generated scene geometry directly in `index.html`; it
+does not embed a second viewer. The generated viewer file remains available for
 offline inspection. No separate Python server is needed.
 
 X/Y are fixed offsets from the initial patient-head position. A1/A2 retain the
 existing geometry; A3 automatically cancels their heading, A4 is LAO and A5 is
-CRAN. The console shows all five backend angles and avoidance state.
+CRAN. The console shows all five drive-originated CAN feedback angles, feedback
+age and avoidance state. UI press/hold/release commands also enter through the
+versioned simulated CAN codec.
 
 ## Status
 
@@ -132,5 +135,6 @@ restart block and Stop acknowledgement, and tests lost-input watchdog stopping.
 python3 tests/test_runtime.py --binary build/pcan_demo
 ```
 
-The required completion checklist is [architecture section 17.5](docs/collision-avoidance/architecture.md#175-mandatory-design-implementation-completion-gate).
+The required completion checklists are [architecture section 17.5](docs/collision-avoidance/architecture.md#175-mandatory-design-implementation-completion-gate)
+and [the integrated workflow gate](docs/collision-avoidance/architecture.md#1812-mandatory-workflow-acceptance-gate).
 The offline viewer and unit tests alone do not satisfy runtime acceptance.

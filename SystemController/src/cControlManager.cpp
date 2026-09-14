@@ -14,9 +14,11 @@ bool cControlManager::InitializeSystem() {
     std::cout << "[cControlManager] Setting up encapsulated dependency injection stack...\n";
     if (!m_PcanController || !m_DriveSubsystem) return false;
 
-    if (!m_DriveSubsystem->Initialize(m_PcanController)) return false; // Match spellings used in your workspace target definitions
-
     if (!m_PcanController->Start()) return false;
+    if (!m_DriveSubsystem->Initialize(m_PcanController)) {
+        m_PcanController->Stop();
+        return false;
+    }
 
     // Register cControlManager methods as the direct callbacks for each CAN Message ID
     m_PcanController->SubscribeMessage(DRIVE_MSG, std::bind(&iDrive::HandleJoystick, m_DriveSubsystem.get(), std::placeholders::_1));

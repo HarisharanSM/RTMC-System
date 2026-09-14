@@ -1,6 +1,8 @@
 # Predictive collision avoidance for RTMC-System
 
-Design revision 2 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
+Design revision 3 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
+
+**Revision 3 workflow implementation:** [Section 18](#18-integrated-joystick-c-arm-display-and-can-workflow) specifies the single-page C-arm display and controller/collision/drive CAN workflow. The simulator implements the integrated canvas, versioned UI commands, coherent drive CAN feedback and predictive stop lifecycle. Section 18.2 records the exact simulation boundary and section 18.12 defines the continuing acceptance gate.
 
 **Deliverable status:** implementation architecture, a reproducible synthetic 3D reference dataset, and a C++ simulation implementation under `collision/`. The application now uses asynchronous preflight, predictive permits and a latched avoidance stop. This is not a released physical safety function: machine dimensions, calibration, measured feedback, backend command acknowledgement, dynamics and stopping performance remain unverified.
 
@@ -556,3 +558,367 @@ inspection in verification.md. Do not mark implementation complete if runtime
 avoidance is disabled, telemetry is merely locally animated, or the real
 application cannot demonstrate the predictive stop and persistent latch.
 This software completion gate does not replace physical release gates G1–G5.
+
+## 18. Integrated joystick, C-arm display and CAN workflow
+
+### 18.1 Scope and required behavior
+
+The operator uses one page, `ui/index.html`, containing joystick controls,
+C-arm rendering, coordinates, motion state and stop reason. The renderer is a
+canvas belonging to this page; there is no iframe, separate live viewer page,
+second document or second telemetry poller in the operator workflow. JavaScript
+and geometry may be separate asset files loaded by this page.
+
+On press, UI input travels through the HTTP-to-CAN gateway to the system
+controller. The controller forwards Start and the selected direction to collision
+supervision. Collision checks the initial occupied volume and the requested
+continuation/braking path. Only a matching clear permission authorizes drive
+Start. On hold, the controller forwards CAN continuation messages to drive;
+drive calculates subsequent joint targets while collision runs independently.
+Drive publishes accepted simulated positions on CAN. The gateway decodes those
+messages and supplies complete pose snapshots to the page. The renderer moves
+only from these received values.
+
+Collision may request Stop at any time before predicted contact. That request
+immediately revokes drive permission and latches the session. Continued hold,
+another Start, or a later clear result cannot restart it. Button release sends
+controller Stop to both collision and drive. After both have acknowledged the
+session and drive has stopped, a new button press creates a new preflight.
+
+The browser has no native CAN access. HTTP is the browser adapter; all motion
+commands crossing that adapter must enter the simulated CAN bus and the same
+decoders used by the application. Likewise, outgoing display poses must cross
+the drive CAN encoder and gateway CAN decoder. Direct drive-object reads must
+not bypass this feedback path.
+
+### 18.2 Implemented simulation boundary
+
+| Area | Revision-3 implementation | Boundary before physical deployment |
+| --- | --- | --- |
+| C-arm display | Canvas, renderer, controls and status are in `index.html`; model JSON is loaded from the same process | Browser rendering is diagnostic and not a safety display |
+| Position source | Five fixed-point angles and speed are assembled by pose sequence and commit before `/state` changes | Values are commanded simulation feedback rather than encoder measurements |
+| CAN transmission | `SendMessage` validates and delivers through the in-process simulated sender and feedback decoder | Physical CAN arbitration, loss and timing need target integration |
+| Start routing | Controller CAN callback enters the collision-enabled drive lifecycle; preflight remains stationary until a finite permit is consumed | Separate physical nodes need an explicit distributed authorization contract |
+| Held input | Versioned CAN Hold reaches the drive command owner; a 50 ms gate prevents burst acceleration while collision renews permits | A target periodic real-time drive task remains hardware work |
+| Stop acknowledgement | Controller Stop invokes drive zero-speed and collision session acknowledgement; latch clears only there | Physical standstill and separate node acknowledgements are unavailable |
+| Pose framing | IDs 0x301–0x305 carry signed 0.0001° angles, 0x307 speed and 0x306 atomic commit | Session/epoch rollover and CAN fault injection require target protocol validation |
+
+Revision-2 geometry, patient reference, finite permits, conservative prediction
+and latch requirements remain applicable. The new workflow preserves A1/A2,
+A3=-(A1+A2), A4=LAO and A5=CRAN. At X=Y=0 the imaging pivot coincides with the
+initial head center; translation changes the imaging pivot without re-zeroing
+the patient coordinate frame.
+
+### 18.3 Components, ownership and execution
+
+```mermaid
+flowchart LR
+    UI[index.html: joystick and canvas] -->|HTTP intent| Gateway[Browser CAN gateway]
+    Gateway -->|UI CAN messages| Bus[Bounded simulated CAN transport]
+    Bus --> Controller[System controller]
+    Controller -->|Start request| Collision[Collision supervisor and worker]
+    Controller -->|Held direction| Drive[Single drive command owner]
+    Controller -->|Stop to both| Collision
+    Controller -->|Stop to both| Drive
+    Collision -->|Finite start and renewal permits| Drive
+    Collision -->|Priority protective stop| Drive
+    Drive -->|Immutable motion snapshots| Collision
+    Drive -->|Accepted pose CAN frames| Bus
+    Bus -->|Feedback decode and assembly| Gateway
+    Gateway -->|Complete pose and status| UI
+```
+
+| Component | Responsibility and owned state |
+| --- | --- |
+| `ui/index.html` and renderer module | Pointer lifecycle, camera, canvas and one decoded display state; no motion integration |
+| `CANMocker` gateway | Validate HTTP requests, encode CAN UI events, assemble received drive feedback, serve cached state/assets |
+| `PCAN` transport and codecs | Encode/decode explicit byte layouts, route by CAN ID, bound queues, prioritize Stop; no geometry |
+| `SystemController` | Own boot/session epoch, validate input order, forward Start/Hold, fan out Stop, aggregate acknowledgements |
+| `drive` owner | Sole writer of calculator/profile, accepted pose and command sequence; consume permits, enforce the 50 ms cadence and execute stop |
+| `collision` supervisor | Preflight lifecycle, immutable scene generation, permission publication, sticky session revocation |
+| Collision worker | Geometry and braking-envelope calculations off the drive thread |
+| Independent stop monitor | Enforce permission/input deadlines and assert stop through the command gate; never calculate angles |
+
+Controller-to-collision/drive logical messages use typed bounded mailboxes in
+this single-process simulator. Their input provenance remains CAN. Drive-to-UI
+position reporting always traverses the CAN transport. Splitting controller,
+collision and drive onto physical CAN nodes is a separate deployment change:
+the same logical messages would require wire mappings, bus timing analysis and
+independent stop delivery. No physical distributed deployment is implied here.
+
+### 18.4 Press, hold, prediction and release sequence
+
+```mermaid
+sequenceDiagram
+    participant UI as index.html
+    participant GW as HTTP/CAN gateway
+    participant CT as Controller
+    participant CO as Collision
+    participant DR as Drive owner
+    UI->>GW: Press(direction, input sequence)
+    GW->>CT: CAN UI_START
+    CT->>CO: StartRequest(session, direction, current snapshot)
+    CO-->>CT: Preflight pending
+    Note over CO,DR: Drive remains stationary
+    CO->>DR: StartPermit(session, scene, envelope, expiry)
+    DR-->>CT: StartAccepted or rejected
+    loop Button remains held
+        UI->>GW: Hold(direction, input sequence)
+        GW->>CT: CAN UI_HOLD
+        CT->>DR: Latest MotionIntent(session, direction)
+        DR->>DR: Tick: verify permit, calculate and commit next pose
+        DR->>CO: Accepted snapshot and next prediction request
+        CO-->>DR: Renew permit or revoke
+        DR->>GW: CAN DRIVE_POSE fragments and commit
+        GW-->>UI: Complete decoded pose
+        UI->>UI: Apply five angles to canvas transforms
+    end
+    alt Collision predicted or permission lost
+        CO->>DR: ProtectiveStop(session, reason)
+        DR->>DR: Zero speed, discard queued movement, latch
+        DR->>GW: CAN final pose and stopped status
+        Note over CO,DR: Hold and repeated Start cannot restart
+    end
+    UI->>GW: Release / cancel / Stop
+    GW->>CT: CAN UI_STOP
+    par Stop fan-out
+        CT->>DR: ControllerStop(session)
+        DR-->>CT: DriveStopped(session, final sequence)
+    and
+        CT->>CO: ControllerStop(session)
+        CO-->>CT: CollisionStopAcknowledged(session)
+    end
+    CT->>CT: Both acknowledgements: retire session
+    Note over UI,DR: Fresh press required for new preflight
+```
+
+Preflight does not need a Hold packet to complete, but drive cannot start unless
+the controller's held-input lease remains valid. A release during preflight
+cancels the session. A delayed clear permit for that session is discarded.
+Hold can renew intent during preflight but cannot cause motion before permission.
+
+### 18.5 Motion and collision state machines
+
+| Controller state | Event | Required action / next state |
+| --- | --- | --- |
+| Disarmed | Fresh valid press | Allocate session, publish StartRequest; Preflight |
+| Preflight | Matching valid start permission and live input lease | Drive accepts authorization; Running |
+| Preflight | Hazard, unknown, timeout or transport failure | Revoke; drive stationary; AvoidanceLatched |
+| Running | Same-direction Hold | Refresh intent lease; drive consumes certified segments |
+| Running | Predicted hazard, expired lease/permit, bad feedback or queue overflow | Priority stop; AvoidanceLatched |
+| AvoidanceLatched | Hold, duplicate Start or late clear | Ignore movement; preserve latch |
+| Any active state | Controller Stop | Cancel intent and permits, fan out Stop; Stopping |
+| Stopping | Drive stopped and collision acknowledgement for same session | Retire session; Disarmed |
+| Stopping | Missing acknowledgement | Stay inhibited; timeout status, no automatic rearm |
+
+Collision keeps a revoked-session marker until ControllerStop is received;
+receipt invalidates every outstanding permit even if geometry is now clear.
+Controller must still wait for drive stop completion before rearming. In the
+simulator, stop completion means commanded zero speed, no pending motion and
+no later commit for that session. Physical standstill requires measured feedback.
+
+Stop is idempotent and has priority over Start, Hold and telemetry. An old Stop
+must not acknowledge a newer session. A global Stop control may stop the current
+session regardless of which browser initiated it; acknowledgement records the
+controller's current session. Direction changes require Stop and a fresh press.
+Multiple simultaneous joystick directions are rejected under this version's
+single-direction contract.
+
+### 18.6 Logical message contracts
+
+| Message | Producer → consumer | Required fields and validation |
+| --- | --- | --- |
+| StartRequest | Controller → collision | Boot/session, intent sequence, direction, snapshot sequence, scene generation; reject stale or active session |
+| StartPermit / RenewalPermit | Collision → drive | Session, request sequence, source pose sequence, scene generation, allowed direction/profile bounds, expiry and certified path coverage |
+| MotionIntent | Controller → drive | Session, monotonically increasing input sequence, same direction, receiver-local lease deadline |
+| MotionSnapshot | Drive → collision | Session, committed sequence, all five axles, Cartesian pose, speed bounds, monotonic timestamp and commanded/measured flag |
+| ProtectiveStop | Collision/monitor → drive | Session and reason; sticky publication outside normal queue |
+| ControllerStop | Controller → both | Current session and stop sequence; invalidate all pending work |
+| DriveStopped | Drive → controller | Session, stop sequence, final pose sequence, zero-speed/queue-empty confirmation |
+| CollisionStopAcknowledged | Collision → controller | Session, stop sequence, permissions invalidated |
+
+A permission is not an unrestricted boolean Start flag. Each movement commit
+must match its direction, source pose, session, scene, sequence and expiry.
+If the calculated next segment is outside its certified envelope or profile
+bounds, drive withholds the commit and requests certification. Geometry never
+executes synchronously inside drive's tick. Preserve a bounded permit pipeline;
+waiting for its renewal must not repeat an already consumed segment.
+
+### 18.7 Revision-3 CAN protocol and coherent display feedback
+
+This is the revision-3 simulator wire contract. UI and pose entries are
+implemented; DRIVE_STATUS and DRIVE_EPOCH remain reserved until status is moved
+from the process-local state snapshot onto a physical or fault-injectable bus.
+Use standard 11-bit classic CAN identifiers, at most 8 data bytes per frame,
+explicit little-endian integers, and no native `memcpy(double)` wire format.
+Reserve and validate these IDs against the complete installed system before a
+hardware mapping. UI message IDs remain reserved for the versioned input codec;
+incompatible older one-byte messages must be rejected in version-3 mode.
+
+| CAN ID | Message | Eight-byte payload, byte offsets / status |
+| --- | --- | --- |
+| 0x001 | UI_HOLD | 0: version u8; 1: direction enum u8; 2: input sequence u16; 4: session token u32 |
+| 0x002 | UI_START | Same layout; token=0 requests a new session; input sequence deduplicates press |
+| 0x003 | UI_STOP | Same layout; direction=0; token identifies session, 0 requests global Stop |
+| 0x180 | DRIVE_STATUS | Reserved: 0 state u8; 1 reason u8; 2 status sequence u16; 4 active session token u32 |
+| 0x181 | DRIVE_EPOCH | Reserved: 0 protocol version u8; 1 flags u8; 2 reserved u16; 4 boot epoch u32 |
+| 0x301–0x305 | DRIVE_POSE_A1–A5 | 0: pose sequence u32; 4: angle signed i32, units 0.0001 degrees |
+| 0x306 | DRIVE_POSE_COMMIT | 0: pose sequence u32; 4: session token u32 |
+| 0x307 | DRIVE_SPEED | 0: pose sequence u32; 4: profile speed signed i32, units 0.0001 degrees/s |
+
+0x201–0x205 remain actuator target identifiers and must not be interpreted as
+feedback. Drive emits the 0x301–0x307 sample only after accepting its simulated
+commit. In hardware, separately identify commanded and encoder-derived samples;
+receiving an actuator target does not prove achieved position.
+
+The gateway permits one active UI control lease, maps the HTTP press identifier
+to the CAN input sequence, and returns the controller-issued session token to
+the browser. Repeated transport retries retain the original press identifier.
+The gateway timestamps arrival using its monotonic clock; browser timestamps
+are diagnostics only. Input u16 sequences use modular ordering within a bounded
+window smaller than 32768. Session-token or pose-sequence exhaustion forces a
+stopped epoch rollover before reuse. New boot epochs discard every old partial
+sample and browser lease. DRIVE_EPOCH is published at startup and periodically;
+reconnection begins with an epoch handshake and waits for a subsequent full sample.
+
+The feedback assembler stores fragments by boot epoch and pose sequence. It
+publishes atomically only after all five angles, speed and matching commit are
+present. Commit arriving early waits for the missing fragments within the
+assembly deadline. Equal duplicate fragments are harmless; conflicting ones
+invalidate the sample. Late, mixed-sequence, malformed or out-of-range fragments
+cannot overwrite the displayed pose. Storage is bounded (two pending samples);
+incomplete samples expire after 150 ms. This covers reordering without an
+unbounded backlog. CAN faults are injected before this assembler in tests.
+
+Display pose and lifecycle are independently sequenced. A stop status must be
+shown immediately even if the final pose sample is incomplete; label the retained
+pose stale rather than inventing the stopped coordinates. Sample timestamps are
+recorded at CAN reception, not refreshed by HTTP polling. At startup, Stop and
+idle, drive emits a complete unchanged pose heartbeat every 100 ms so a stationary
+machine can still demonstrate fresh feedback. Publish state changes immediately.
+
+### 18.8 Single-page rendering and browser interaction
+
+The page contains a canvas, X/Y joystick, LAO/CRAN joystick, Stop/acknowledge
+button, axis values, head/imaging markers and one status area. Extract reusable
+geometry drawing from `tools/collision_reference_viewer.html` into a renderer
+module with `initialize(canvas, scene)`, `setPose(axles)` and `resize()` operations.
+Camera rotation/zoom affects only viewing. Remove live-mode iframe and duplicate
+polling. The offline reference viewer may remain a development artifact.
+
+Use one `GET /state` poll every 100 ms initially. Its pose fields are populated
+exclusively by the CAN feedback assembler. Include `protocol_version`, `boot_epoch`,
+`session`, `pose_sequence`, `axles_deg`, `speed_dps`, `pose_source`,
+`pose_age_ms`, `feedback_valid`, `state`, `reason`, `scene_generation` and
+`geometry_hash`. Controller/collision diagnostics may supplement the response,
+but must not inject alternate axle values. Return absent/invalid pose before
+the first complete CAN sample; show “Waiting for drive feedback.”
+
+The renderer computes visual transforms and displayed X/Y from received axles
+using section 17.1. It does not run joystick IK or extrapolate motion from time.
+Redraw the most recent complete sample using `requestAnimationFrame`; do not
+interpolate through an unverified path. Retain the last pose and show stale
+feedback after 300 ms without a fresh assembled CAN sample, even if HTTP replies
+continue successfully. Stale feedback inhibits new UI Start and triggers an
+attempted Stop; backend leases provide independent protection if the UI fails.
+
+Pointer down emits one Start. Pointer capture and a single active-input epoch
+prevent duplicate starts. Hold emits intent every 50 ms only while the same
+pointer remains pressed. Release, cancellation, lost capture, window blur,
+hidden document and explicit Stop invalidate that epoch and send Stop. Drop
+unsent Hold requests before queuing Stop; allow at most one in-flight Hold and
+one latest pending intent. Stop must not wait behind an accumulating HTTP chain.
+Page-close delivery is best effort; backend input expiry handles a lost release.
+
+### 18.9 Scheduling, prediction and failure response
+
+Retain a 50 ms simulation drive cadence, 50 ms input heartbeat, 150 ms input lease,
+150 ms finite permit deadline and independent 1 ms stop monitor. The command
+owner admits at most one segment per cadence and cannot advance faster when CAN messages
+arrive in a burst. It performs no HTTP work, geometry work, file writes or
+unbounded logging. CAN output uses bounded queues; failure to publish required
+control/feedback state stops the affected session. UI rendering cannot delay
+drive or collision execution.
+
+Prediction retains the 250 ms reaction allowance and 20 mm model margin from
+section 17.4. It covers speed, possible acceleration, braking distance and swept
+volumes of every relevant body, including rotational corner motion. For each
+renewal, cover the next allowed segment and its worst-case stop. Unknown or
+over-budget prediction is a denial. The changed queue/scheduling path must fit
+the existing allowance in measured simulation tests; if it does not, enlarge
+the allowance and revalidate clearances before enabling motion.
+
+| Failure | Required response |
+| --- | --- |
+| Release before preflight finishes | Cancel session; reject late permission; zero commits |
+| Held input after collision stop | Preserve latch and publish reason; zero new commits |
+| CAN command loss or browser disappearance | Input lease expires; stop without another callback |
+| Collision worker stalls | Permission expires; independent monitor stops |
+| Missing feedback fragment | Hold previous displayed pose; expire partial sample; never combine sequences |
+| HTTP healthy but CAN feedback stalled | Show CAN age/stale state; no fabricated freshness |
+| Stop only reaches one recipient | Keep controller Stopping; retry idempotently; no new Start |
+| New boot, mismatched model or invalid numeric data | Inhibit motion/display updates until valid handshake and model agreement |
+
+### 18.10 Static data and model agreement
+
+Reuse `data/collision/reference/parameters.json`, generated scene geometry and
+the five-axis transforms. This workflow changes transport and page composition,
+not physical dimensions. Keep meters/Z-up in geometry and explicit cm/degree
+adapters at the legacy boundary. All assets remain original synthetic proxies.
+
+Load scene geometry once into the index renderer. Include a model hash in the
+gateway handshake and compare it with the loaded asset manifest before enabling
+Start. The hash must identify the runtime collision representation too: generate
+a typed C++ scene from the same source or add a field-by-field runtime-scene
+comparison against the manifest. Merely hashing the viewer JSON cannot prove
+that separately handwritten C++ geometry agrees. Failure inhibits motion and
+shows a model mismatch. Scene replacement requires stopped state and invalidates
+existing permissions and any cached renderer transforms.
+
+### 18.11 Implementation work packages
+
+| Order | Work package | Concrete deliverable / completion criterion |
+| --- | --- | --- |
+| 1 | CAN contract and codecs | Shared versioned input/status/pose codecs, bounded bus, malformed/version/order tests; `SendMessage` delivers frames |
+| 2 | Controller lifecycle | Session allocation, Start to collision, Hold to drive, priority Stop fan-out, both acknowledgements; ordering tests |
+| 3 | Drive ownership and permits | Periodic single owner, finite permission gate, immutable snapshots, stop monitor integration; existing kinematics preserved |
+| 4 | Drive feedback | Post-commit CAN encoding, unchanged-pose heartbeat, gateway assembler; no direct pose-cache mutation |
+| 5 | Index renderer | Shared canvas renderer in index, one state poller, received-angle-only movement, pointer/Stop behavior |
+| 6 | Model agreement | Runtime/generated geometry agreement and handshake hash validation |
+| 7 | Runtime acceptance and documentation | Tests below against freshly built `pcan_demo`; update implementation/verification records with actual evidence |
+
+Changes principally affect `includes/`, `PCAN/`, `SystemController/`, `drive/`,
+`collision/`, `CANMocker/`, `ui/index.html` and renderer assets. Edit generator
+sources before regenerating reference outputs. Keep revision-2 unit suites as
+regressions, but replace tests that demand an iframe with the version-3 contract.
+
+### 18.12 Mandatory workflow acceptance gate
+
+Section 17.5 remains applicable to geometry and predictive avoidance. Replace
+its iframe/viewer route criterion with the integrated-index criteria below.
+Prior 15-check runtime success does not establish this revision's completion.
+
+| ID | Test | Required evidence |
+| --- | --- | --- |
+| WF-01 | Open `/` from actual `pcan_demo` | Canvas, joysticks and state in one document; no iframe or separate live navigation |
+| WF-02 | Press each of eight directions | CAN trace retains selected direction; controller routes Start to collision; no premature drive commit |
+| WF-03 | Clear versus denied preflight | Clear starts only with valid matching permit; denied/unknown remains stationary |
+| WF-04 | Hold and burst traffic | Drive progresses at bounded cadence, renews permits, preserves five-axis rate limits and A3 compensation |
+| WF-05 | Drive-originated display | Trace a committed pose through CAN encode, bus delivery, decode and canvas transform; no alternate state source |
+| WF-06 | Drop/reorder/corrupt one pose fragment | No mixed pose; stale age advances despite successful HTTP requests |
+| WF-07 | Approach pedestal | Predictive stop before contact, measured simulated clearance recorded, no commits after latch |
+| WF-08 | Hold/duplicate Start after latch | No restart; late CLEAR ignored |
+| WF-09 | Release, cancel, blur and explicit Stop | Controller Stop reaches both consumers; both acknowledgements precede rearm |
+| WF-10 | Release during preflight | Late authorization causes zero motion |
+| WF-11 | Hold one Stop acknowledgement | State remains Stopping and rejects new Start |
+| WF-12 | Lose commands or stall collision | Independent deadlines stop without another UI/drive callback |
+| WF-13 | Boot rollover, sequence wrap and duplicate input | Old samples/intents cannot enter a new session; retry causes no duplicate press |
+| WF-14 | Head/LAO/CRAN and X/Y tests | Head origin, imaging pivot and five-axis FK agree in runtime and index renderer |
+| WF-15 | Model mismatch and startup faults | Motion inhibited with explicit reason; no disabled-avoidance runtime mode |
+| WF-16 | Build, regression and concurrency tests | Existing kinematics/collision/data tests plus new workflow tests pass; sanitizer evidence recorded |
+
+Record application revision, host/toolchain, CAN fault-injection traces,
+browser checks, pose freshness, stop latency and observed clearance in
+`verification.md`. Mark revision 3 implemented only after these software checks
+pass against the same executable and assets. Physical release evidence remains
+governed by G1–G5.

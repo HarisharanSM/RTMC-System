@@ -34,14 +34,18 @@ If CMake is unavailable, the test sources are listed in `CMakeLists.txt` and can
 - Do not introduce concurrent mutation of `cDriveCalculator` or drive state. Future avoidance integration must respect the documented single drive owner and finite permit contract.
 - Preserve unrelated user changes. Do not replace existing motion limits, protocol semantics or model dimensions with manufacturer-reference values without a requested, documented change.
 
-## Live five-axis runtime
+## Integrated five-axis runtime
 
-- `pcan_demo` serves the console, generated live viewer, `GET /state`, and ordered
-  `POST /command` on loopback port 8082. No detached UI server is needed.
-- Telemetry is simulated commanded state; it is not physical encoder feedback.
-- Five CAN target fields are A1/A2/A3 alignment/A4 LAO/A5 CRAN, IDs 0x201–0x205.
+- `pcan_demo` serves one joystick/C-arm canvas page, `GET /state`, model JSON,
+  and ordered `POST /command` on loopback port 8082. The generated viewer is an
+  offline engineering artifact; the runtime page has no iframe.
+- UI commands use revision-3 CAN frames with direction, sequence and session.
+  Accepted drive poses return through coherent fixed-point CAN feedback IDs
+  0x301–0x307 before `/state` and the canvas can observe them.
+- Telemetry is simulated commanded feedback, not physical encoder feedback.
+  Five actuator target fields remain A1/A2/A3/A4/A5 on IDs 0x201–0x205.
 - The independent 1 ms stop monitor enforces 150 ms permission renewal expiry;
   the predictor uses a 250 ms simulation reaction allowance.
-- Changing frames or drive/avoidance behavior requires the architecture section
-  17.5 completion gate, including `tests/test_runtime.py` against the actual
+- Changing frames or drive/avoidance behavior requires architecture sections
+  17.5 and 18.12, including `tests/test_runtime.py` against the actual
   executable. A static viewer or library-only test is insufficient.

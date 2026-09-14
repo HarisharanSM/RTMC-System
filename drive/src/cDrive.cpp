@@ -16,7 +16,11 @@ bool cDrive::Initialize(std::shared_ptr<iPCANController> pCANptr) {
     auto supervisor = std::make_unique<RTMCCollision::cCollisionSupervisor>(
         RTMCCollision::cSceneRegistry::CreateReferenceScene(true));
     m_Controller = std::make_unique<cDriveController>(pCANptr, std::move(supervisor));
-    return m_Controller->GetCurrentErrorCode() == 0;
+    if (m_Controller->GetCurrentErrorCode() != 0) return false;
+    // Publish home through the drive's sequenced CAN feedback path before the
+    // UI connects. Direct controller unit fixtures keep their original counts.
+    if (pCANptr) pCANptr->SetPosition(m_Controller->GetCurrentAxelPosition());
+    return true;
 }
 
 void cDrive::HandleJoystick(const joystickSignal& signal) {

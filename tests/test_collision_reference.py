@@ -82,6 +82,15 @@ class ReferenceDataTests(unittest.TestCase):
                 for j in range(3):
                     self.assertAlmostEqual(frame[i][j],float(i==j))
 
+    def test_head_side_support_and_a5_limits(self):
+        home = ref.frames(self.p, self.p['kinematics']['home_deg'])
+        column = next(b for b in self.scene['bodies'] if b['id'] == 'support_column')
+        center = ref.transform(home['eof_support'], column['center_m'])
+        self.assertLess(center[0], -.70)
+        self.assertAlmostEqual(center[1], 0.0, places=12)
+        self.assertEqual(self.p['kinematics']['joint_limits_deg'][4], [-90, 90])
+        self.assertEqual(self.scene['pair_margin_m'], .01)
+
     def test_reference_gap_and_sid(self):
         r = self.p["robot"]
         gap = r["detector_center_m"][2] - r["detector_size_m"][2]/2 - (r["source_center_m"][2] + r["source_size_m"][2]/2)

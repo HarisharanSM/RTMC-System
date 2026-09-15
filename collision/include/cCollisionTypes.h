@@ -101,10 +101,14 @@ struct PredictionSettings {
     double maximumAngularSpeedRadps = 1.0471975511965976;
     double maximumAngularAccelerationRadps2 = 2.0943951023931953;
     double guaranteedAngularDecelerationRadps2 = 2.0943951023931953;
-    double pairMarginM = 0.020;
+    // Residual surface clearance after the complete predicted stop. This is
+    // one full-speed 50 ms linear command step (1 cm), not the stopping range.
+    double pairMarginM = 0.010;
     double permitLifetimeS = 0.150;
     double intervalMotionToleranceM = 0.0005;
-    int maximumSubdivisionDepth = 14;
+    // Folded-home joint motion changes as sqrt(Cartesian travel); extra depth
+    // is needed to certify close but separated head-side support geometry.
+    int maximumSubdivisionDepth = 20;
 };
 
 } // namespace RTMCCollision

@@ -44,7 +44,7 @@
       "center_m": [
         0.75,
         0,
-        0.12500000000000003
+        0.09000000000000001
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -83,7 +83,7 @@
     {
       "center_m": [
         0,
-        -0.45,
+        -0.375,
         0
       ],
       "collision_enabled": true,
@@ -96,15 +96,15 @@
       "shape": "box",
       "size_m": [
         0.16,
-        1.06,
+        0.91,
         0.16
       ]
     },
     {
       "center_m": [
         0,
-        -0.9,
-        0.25999999999999995
+        -0.75,
+        0.45999999999999996
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -117,7 +117,7 @@
       "size_m": [
         0.16,
         0.16,
-        0.5199999999999999
+        0.9199999999999999
       ]
     },
     {
@@ -789,15 +789,15 @@
     "carm"
   ],
   "hardware_authorization": false,
-  "model_id": "rtmc-head-aligned-five-axis-v2",
-  "pair_margin_m": 0.02,
+  "model_id": "rtmc-head-side-five-axis-v3",
+  "pair_margin_m": 0.01,
   "pair_policy": {
     "adjacent_body_exclusions": [],
     "default": "check all robot-environment and inter-body robot pairs",
     "note": "No blanket adjacent-link exclusions. Intended joints/floor support contacts require reviewed local contact masks before runtime use. Preview poses are not certified collision-free.",
     "same_rigid_body": "exclude internal primitive overlaps"
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "status": "simulation_only",
   "transform_layout": "row-major 4x4; column vectors; local point to world",
   "uncertainty_status": "unmeasured; margin is illustrative, not a physical bound",

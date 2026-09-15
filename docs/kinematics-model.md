@@ -131,7 +131,7 @@ values:
 
 ```
 A1 in [-180, +10] deg      A2 in [0, 180] deg
-A3 in [-180, +180] deg     A4 in [-180, +180] deg     A5 in [-180, +180] deg
+A3 in [-180, +180] deg     A4 in [-180, +180] deg     A5 in [-90, +90] deg
 ```
 
 A1 = −180° and A2 = 180° are the closed pose; A1 = A2 = 0° is full extension.

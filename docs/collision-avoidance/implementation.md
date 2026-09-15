@@ -1,6 +1,6 @@
 # C++ collision module — implementation status
 
-Revision 3, 2026-09-14. This document records what the repository implements from the [architecture](architecture.md) and what remains dependent on physical machine evidence.
+Revision 4, 2026-09-15. This document records what the repository implements from the [architecture](architecture.md) and [head-side redesign](head-side-clearance-design.md), and what remains dependent on physical machine evidence.
 
 The integrated `index.html` canvas and drive-originated CAN feedback workflow
 are implemented according to [architecture revision 3, section 18](architecture.md#18-integrated-joystick-c-arm-display-and-can-workflow).
@@ -13,7 +13,7 @@ An unchanged-pose CAN heartbeat keeps feedback age meaningful while stationary.
 
 `cDrive::Initialize` constructs the compiled pheno-inspired/fixed-table reference scene and starts `cCollisionSupervisor`. Start now carries its real joystick direction from the HTTP/CAN mocker. `cDriveController` creates a session, holds zero speed, publishes a preflight request and waits without running geometry on the drive callback.
 
-The collision worker calculates a conservative travel distance covering the configured reaction interval and braking distance. It maps each predicted pose through the existing relative-A2 kinematics, transforms all link/C-arm box bodies, and checks robot/environment plus selected self-collision pairs. A separating-axis OBB test supplies exact pose overlap and a separating gap. Adaptive interval subdivision certifies that the gap exceeds geometric margin plus an upper bound on body movement throughout the interval. A result that cannot be certified within bounded subdivision is `Unknown`, which has the same stop effect as `Hazard`.
+The collision worker calculates a conservative travel distance covering the configured reaction interval and braking distance without accelerating beyond the enforced drive speed cap. It maps each predicted pose through the existing relative-A2 kinematics, transforms all link/C-arm box bodies, and checks robot/environment plus selected self-collision pairs. A separating-axis OBB test supplies exact pose overlap and a cheap separation bound; unresolved diagonal cases use exact box closest-feature distance. Adaptive interval subdivision certifies that distance exceeds the 10 mm residual gap plus an upper bound on body movement throughout the interval. A result that cannot be certified within bounded subdivision is `Unknown`, which has the same stop effect as `Hazard`.
 
 The worker returns a finite permit with session, request sequence, scene generation and expiration time through a bounded single-producer/single-consumer mailbox. The drive consumes that exact permit once, issues one motion update, then immediately requests the next permit. Queue failure, result mismatch, expiry, direction change or collision-worker revocation calls the protective-stop path. A 1 ms independent monitor observes sticky worker revocation and the 150 ms renewal deadline and writes zero speed even if no further joystick callback arrives. The final position-command gate uses a non-waiting lock and rechecks revocation before transport. The stopped state stays latched until `StopDrive` acknowledges the session.
 
@@ -26,7 +26,7 @@ The worker returns a finite permit with session, request sequence, scene generat
 | `collision/include/cSpscMailbox.h` | Fixed-capacity wait-free SPSC publication boundary |
 | `collision/src/cSceneRegistry.cpp` | Compiled simulation scene matching reference parameters |
 | `collision/src/cBodyKinematics.cpp` | RTMC A1/A2 and A3 alignment and provisional A4/A5 3D body transforms and motion bounds |
-| `collision/src/cProximityBackend.cpp` | Oriented-box separating-axis overlap and separation gap |
+| `collision/src/cProximityBackend.cpp` | Oriented-box SAT overlap/broad rejection and closest-feature 3D distance |
 | `collision/src/cTrajectoryPredictor.cpp` | Braking travel, kinematic clipping and conservative interval certification |
 | `collision/src/cCollisionSupervisor.cpp` | Worker lifecycle, mailboxes, session filtering and sticky stop request |
 | `drive/src/cDriveController.cpp` | Preflight/running/latch states, 1 ms stop monitor and final permit gate |
@@ -40,7 +40,7 @@ The scene is compiled from the same numerical assumptions as `data/collision/ref
 
 ## Simulation constants
 
-Prediction settings currently use 250 ms reaction allowance, 0.20 m/s maximum linear speed, 0.40 m/s² possible linear acceleration, 0.50 m/s² braking magnitude, 60°/s maximum angular speed, 120°/s² possible angular acceleration and braking, 20 mm pair margin, and 0.5 mm interval-motion tolerance. The worker assumes the maximum configured speed because measured velocity is absent. This yields 152.5 mm linear continuation/braking travel. All settings are checked for finite, valid ranges before any clear permit can be issued. These are simulation settings, not measured guarantees.
+Prediction settings currently use 250 ms reaction allowance, 0.20 m/s maximum linear speed, 0.40 m/s² possible linear acceleration, 0.50 m/s² braking magnitude, 60°/s maximum angular speed, 120°/s² possible angular acceleration and braking, 10 mm residual pair gap, and 0.5 mm interval-motion tolerance. The worker assumes maximum configured speed because measured velocity is absent, but caps reaction acceleration at that speed. This yields 90 mm linear and 30° angular continuation/braking travel. Folded-home certification permits up to 20 interval subdivisions. All settings are validated before any clear permit can be issued. These are simulation settings, not measured guarantees.
 
 The application callback cadence remains input-driven at 50 ms. A permit lives for 150 ms and the controller allows 150 ms for preflight/result delivery. The reference-scene unit check requires one +X prediction at home to complete within 50 ms on the test host. This is a development threshold rather than target-hardware worst-case timing evidence.
 
@@ -86,5 +86,27 @@ link 2; synthetic interface exclusions remain an explicit limitation.
 
 The mandatory completion checklists are architecture sections 17.5 and 18.12. CTest includes
 `runtime_avoidance` when Python is installed. It tests the real executable,
-including predictive pedestal stopping and persistent latch, rather than only
+including predictive fixed-table stopping and persistent latch, rather than only
 the collision library. See verification.md for actual results.
+
+## Revision 4: head-side geometry and clearance behavior
+
+A5/CRAN/CAUD now clamps to ±90° in the drive authority and generated model.
+The integrated index and offline viewer use the same revised transform chain:
+A3 continues to cancel A1+A2 yaw, the non-tilting rear beam/column receives a
+fixed −90° mount rotation toward patient −X, and the imaging arc remains in its
+neutral YZ plane around the patient. A4 rotates that arc about longitudinal X;
+A5 rotates about the subsequent Y axis. The synthetic under-table link heights
+are now 0.10/0.28 m and rear support reach is 0.75 m to avoid manufacturing an
+unmodelled non-adjacent overlap at folded home.
+
+The residual surface gap is 10 mm. SAT remains the cheap overlap/broad rejection
+stage; near diagonal boxes use vertex/face and edge/edge closest-feature distance.
+Reaction acceleration is capped at the configured drive speed, reducing the
+unmeasured maximum-speed horizons from 152.5 to 90 mm and from 52.5° to 30°.
+The fold singularity requires up to 20 bounded interval subdivisions. Unknown,
+deadline failure and collision retain fail-closed stop/latch behavior.
+
+The HTTP listener now closes its listening descriptor before joining its worker,
+so SIGTERM reliably performs supervised shutdown on macOS. This change does not
+alter command protocol or motion authority.

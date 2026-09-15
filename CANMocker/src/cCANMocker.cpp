@@ -56,9 +56,15 @@ bool cCANMocker::Start() {
 }
 void cCANMocker::Stop() {
     if(!m_IsRunning.exchange(false)) return;
-    shutdown(m_ServerFd,SHUT_RDWR);
+    // On macOS shutdown() alone does not reliably wake a thread blocked in
+    // accept(). Close the listening descriptor before joining the worker.
+    const int serverFd=m_ServerFd;
+    m_ServerFd=-1;
+    if(serverFd>=0) {
+        shutdown(serverFd,SHUT_RDWR);
+        close(serverFd);
+    }
     if(m_WorkerThread.joinable()) m_WorkerThread.join();
-    close(m_ServerFd); m_ServerFd=-1;
 }
 void cCANMocker::MockingLoop() {
     const std::map<std::string,int> buttons{

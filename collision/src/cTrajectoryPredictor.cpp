@@ -16,8 +16,17 @@ double StoppingTravel(double speed, bool velocityMeasured, double maximumSpeed,
     // The simulator has commanded pose but no measured velocity. Until a motion
     // backend supplies bounded measured feedback, use maximum speed.
     if (!velocityMeasured) speed = maximumSpeed;
-    const double speedAtBrake = speed + acceleration * reactionTime;
-    const double reactionTravel = speed * reactionTime + 0.5 * acceleration * reactionTime * reactionTime;
+    // Acceleration during the reaction window is bounded by the same speed cap
+    // that the drive enforces. The previous expression could predict 90 deg/s
+    // from a 60 deg/s limited drive and unnecessarily reject useful rotation.
+    double accelerationTime = 0.0;
+    if (acceleration > 0.0 && speed < maximumSpeed) {
+        accelerationTime = std::min(reactionTime, (maximumSpeed - speed) / acceleration);
+    }
+    const double speedAtBrake = std::min(maximumSpeed, speed + acceleration * accelerationTime);
+    const double reactionTravel = speed * accelerationTime +
+        0.5 * acceleration * accelerationTime * accelerationTime +
+        speedAtBrake * (reactionTime - accelerationTime);
     return reactionTravel + speedAtBrake * speedAtBrake / (2.0 * braking);
 }
 
@@ -158,6 +167,10 @@ cTrajectoryPredictor::eIntervalResult cTrajectoryPredictor::CheckPair(
                                        m_Kinematics.BoundBodyMotion(other, middle, end));
     const double requiredGap = m_Settings.pairMarginM + movingBound + otherBound;
     if (separation.largestSeparatingGapM > requiredGap) return eIntervalResult::Clear;
+    // SAT's largest axis gap is a conservative lower bound. Spend the more
+    // expensive closest-feature calculation only for near, diagonal cases.
+    if (m_Proximity.SurfaceDistance(movingMiddle, otherMiddle) > requiredGap)
+        return eIntervalResult::Clear;
 
     result.movingBody = moving.id.c_str();
     result.obstacle = other.id.c_str();

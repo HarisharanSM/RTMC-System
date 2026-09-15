@@ -12,6 +12,9 @@ constexpr double DEG_TO_RAD = PI / 180.0;
 constexpr double LINK1_M = 0.75;
 constexpr double LINK2_M = 1.00;
 constexpr double BASE_X_M = -0.25;
+// The synthetic arc was authored with its rear structure along local -Y.
+// Rotate that neutral construction so rearward is patient -X (headward).
+constexpr double HEAD_SIDE_MOUNT_RAD = -PI / 2.0;
 
 Transform3 Pose(const Vec3& translation, const Mat3& rotation = Mat3{}) {
     return {rotation, translation};
@@ -36,7 +39,7 @@ cBodyKinematics::FrameTransforms cBodyKinematics::CalculateFrames(const AxelPost
     const double a12 = (axles.A1 + axles.A2) * DEG_TO_RAD;
     const double a4 = axles.A4 * DEG_TO_RAD;
     const double a5 = axles.A5 * DEG_TO_RAD;
-    const Vec3 elbow{BASE_X_M + LINK1_M * std::cos(a1), LINK1_M * std::sin(a1), 0.68};
+    const Vec3 elbow{BASE_X_M + LINK1_M * std::cos(a1), LINK1_M * std::sin(a1), 0.28};
     const Vec3 eof{elbow.x + LINK2_M * std::cos(a12),
                    elbow.y + LINK2_M * std::sin(a12), 1.20};
     const Mat3 heading = RotationZ(a12);
@@ -44,11 +47,15 @@ cBodyKinematics::FrameTransforms cBodyKinematics::CalculateFrames(const AxelPost
 
     FrameTransforms frames{};
     frames[FrameIndex(eBodyFrame::World)] = Pose({0, 0, 0});
-    frames[FrameIndex(eBodyFrame::Link1)] = Pose({BASE_X_M, 0, 0.43}, RotationZ(a1));
+    frames[FrameIndex(eBodyFrame::Link1)] = Pose({BASE_X_M, 0, 0.10}, RotationZ(a1));
     frames[FrameIndex(eBodyFrame::Link2)] = Pose(elbow, heading);
-    frames[FrameIndex(eBodyFrame::EofSupport)] = Pose({eof.x, eof.y, 0.68}, aligned);
+    const Mat3 mount = RotationZ(HEAD_SIDE_MOUNT_RAD);
+    frames[FrameIndex(eBodyFrame::EofSupport)] = Pose(
+        {eof.x, eof.y, 0.28}, Multiply(aligned, mount));
+    // A4 is patient-longitudinal LAO/RAO and A5 is the subsequent transverse
+    // CRAN/CAUD tilt. Both rotate about the imaging centre at eof.
     frames[FrameIndex(eBodyFrame::CArm)] = Pose(eof,
-        Multiply(Multiply(aligned, RotationY(a4)), RotationX(a5)));
+        Multiply(Multiply(aligned, RotationX(a4)), RotationY(a5)));
     return frames;
 }
 

@@ -6,7 +6,8 @@ printed by the test binary.
 Fixture constants: `L1 = 75 cm`, `L2 = 100 cm`, `BASE = (-25, 0) cm`,
 `tick = 50 ms`, `MAX_LINEAR_SPEED = 20 cm/s`, `MAX_ANGULAR_SPEED = 60 deg/s`,
 `MAX_JOINT_SPEED = 60 deg/s`, `JOINT_ACCEL = 120 deg/s²`,
-`A1 ∈ [-180, 10]°`, `A2 ∈ [0, 180]°`, `A3, A4, A5 ∈ [-180, 180]°`.
+`A1 ∈ [-180, 10]°`, `A2 ∈ [0, 180]°`, `A3, A4 ∈ [-180, 180]°`,
+`A5 ∈ [-90, 90]°`.
 
 ---
 
@@ -176,6 +177,11 @@ that** commanded speeds are physically achievable.
 ### KIN-17 — Angular axes clamp at their travel limits
 - **Given** LAO is driven positive for 200 ticks
 - **Then** LAO saturates at +180° and never exceeds it
+
+### KIN-25 — CRAN/CAUD clamp at ±90°
+- **Given** CRAN or CAUD is held beyond its configured travel
+- **Then** CRAN saturates exactly at +90° and CAUD at −90°
+- **And** neither direction wraps, overshoots or renews numerical creep
 
 ---
 

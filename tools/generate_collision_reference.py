@@ -56,13 +56,14 @@ def frames(parameters, degrees):
            elbow[1] + k["link2_m"] * math.sin(a1 + a2)]
     heading = rotation("z", a1 + a2)
     aligned = rotation("z", a1 + a2 + a3)
+    mount = rotation("z", math.radians(k["mount_rotation_deg"]))
     return {
         "world": identity(),
         "link1": multiply(translation(bx, by, k["link1_center_z_m"]), rotation("z", a1)),
         "link2": multiply(translation(*elbow, k["link2_center_z_m"]), heading),
-        "eof_support": multiply(translation(*eof, k["link2_center_z_m"]), aligned),
+        "eof_support": multiply(multiply(translation(*eof, k["link2_center_z_m"]), aligned), mount),
         "carm": multiply(multiply(multiply(translation(*eof, k["isocenter_z_m"]),
-                                             aligned), rotation("y", a4)), rotation("x", a5)),
+                                             aligned), rotation("x", a4)), rotation("y", a5)),
     }
 
 
@@ -126,7 +127,7 @@ def build_scene(p):
     size = p["environment"]["floor_size_m"]
     box("floor", "world", "floor", size, [0.5, 0, -size[2] / 2])
     return {
-        "schema_version": 2, "model_id": p["model_id"], "status": p["status"],
+        "schema_version": 3, "model_id": p["model_id"], "status": p["status"],
         "hardware_authorization": False, "units": p["units"],
         "transform_layout": "row-major 4x4; column vectors; local point to world",
         "frames": ["world", "link1", "link2", "eof_support", "carm"],

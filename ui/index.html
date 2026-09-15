@@ -22,7 +22,7 @@ button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;
   <div id="position" class="readout">Waiting for drive CAN feedback.</div>
  </section>
  <aside>
-  <div class="warning">SIMULATION ONLY · Synthetic geometry and configured braking bounds.</div>
+  <div class="warning">SIMULATION ONLY · 10 mm residual gap · CRAN/CAUD ±90° · Synthetic geometry and braking bounds.</div>
   <div class="axes">
    <div class="axis"><b>A1</b><span id="a1">—</span></div><div class="axis"><b>A2</b><span id="a2">—</span></div>
    <div class="axis"><b>A3</b><span id="a3">—</span></div><div class="axis"><b>A4 LAO</b><span id="a4">—</span></div>
@@ -60,10 +60,10 @@ function frames(q){
  const k=parameters.kinematics,[a,b,c,d,e]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
  const elbow=[x+k.link1_m*Math.cos(a),y+k.link1_m*Math.sin(a)];
  const eof=[elbow[0]+k.link2_m*Math.cos(a+b),elbow[1]+k.link2_m*Math.sin(a+b)];
- const heading=rot('z',a+b),aligned=rot('z',a+b+c);
+ const heading=rot('z',a+b),aligned=rot('z',a+b+c),mount=rot('z',k.mount_rotation_deg*Math.PI/180);
  return {world:identity(),link1:mul(tr(x,y,k.link1_center_z_m),rot('z',a)),
-  link2:mul(tr(...elbow,k.link2_center_z_m),heading),eof_support:mul(tr(...eof,k.link2_center_z_m),aligned),
-  carm:mul(mul(mul(tr(...eof,k.isocenter_z_m),aligned),rot('y',d)),rot('x',e))};
+  link2:mul(tr(...elbow,k.link2_center_z_m),heading),eof_support:mul(mul(tr(...eof,k.link2_center_z_m),aligned),mount),
+  carm:mul(mul(mul(tr(...eof,k.isocenter_z_m),aligned),rot('x',d)),rot('y',e))};
 }
 function project(p,w,h){const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw),u=c*x-s*y,v=s*x+c*y;return[w/2+zoom*u,h/2-zoom*(z*Math.cos(pitch)-v*Math.sin(pitch)),v*Math.cos(pitch)+z*Math.sin(pitch)];}
 function bodyColor(b){if(b.rigid_body==='patient_fixture')return'#e1ae63';if(b.rigid_body==='fixed_table')return'#6389bd';if(b.frame==='carm')return'#c8d6e5';return'#48baa9';}

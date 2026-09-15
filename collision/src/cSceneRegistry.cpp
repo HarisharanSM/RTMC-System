@@ -31,9 +31,9 @@ cSceneRegistry cSceneRegistry::CreateReferenceScene(bool includePatientFixture) 
     scene.AddBody(Box("link2_housing", "link2", eBodyFrame::Link2,
                       {0.50, 0, 0}, {1.00, 0.16, 0.14}));
     scene.AddBody(Box("support_rear_beam", "alignment", eBodyFrame::EofSupport,
-                      {0, -0.45, 0}, {0.16, 1.06, 0.16}));
+                      {0, -0.375, 0}, {0.16, 0.91, 0.16}));
     scene.AddBody(Box("support_column", "alignment", eBodyFrame::EofSupport,
-                      {0, -0.90, 0.26}, {0.16, 0.16, 0.52}));
+                      {0, -0.75, 0.46}, {0.16, 0.16, 0.92}));
 
     constexpr int segments = 24;
     constexpr double inner = 0.70;

@@ -2,6 +2,8 @@
 
 Design revision 3 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
 
+**Revision 4 — 2026-09-15:** [Head-side C-arm, angular limits and clearance redesign](head-side-clearance-design.md) analyses the four reported issues and specifies the implemented simulation geometry, predictive avoidance changes, runtime integration and acceptance tests. Physical calibration and release evidence remain open.
+
 **Revision 3 workflow implementation:** [Section 18](#18-integrated-joystick-c-arm-display-and-can-workflow) specifies the single-page C-arm display and controller/collision/drive CAN workflow. The simulator implements the integrated canvas, versioned UI commands, coherent drive CAN feedback and predictive stop lifecycle. Section 18.2 records the exact simulation boundary and section 18.12 defines the continuing acceptance gate.
 
 **Deliverable status:** implementation architecture, a reproducible synthetic 3D reference dataset, and a C++ simulation implementation under `collision/`. The application now uses asynchronous preflight, predictive permits and a latched avoidance stop. This is not a released physical safety function: machine dimensions, calibration, measured feedback, backend command acknowledgement, dynamics and stopping performance remain unverified.
@@ -272,7 +274,7 @@ The accompanying [data specification](data-specification.md) defines the deliver
 
 Use meters, radians and seconds internally. Legacy centimeters and degrees convert once at the adapter boundary. World frame W is right-handed with Z up, X along the declared EOF travel, Y across it. W=(0,0,0) is the floor point below the closed-pose EOF, not the base axle. The base's planar offset stays (-0.25,0) m.
 
-Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4/A5 use [-180,180] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are new explicit simulation assumptions. The C-arm transform is provisionally `Rz(A1+A2+A3) * Ry(A4) * Rx(A5)`, with `A3=-(A1+A2)`, at the EOF X/Y and an assumed isocenter height. Actual LAO/CRAN axes and offsets are a release blocker, not inferred facts.
+Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4 use [-180,180] and A5 uses [-90,90] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are explicit simulation assumptions. Revision 4 uses `Rz(A1+A2+A3) * Rx(A4) * Ry(A5)` for the C-arm, with `A3=-(A1+A2)`, at the EOF X/Y and an assumed isocenter height. The non-tilting rear support additionally uses fixed `Rz(-90°)` to extend toward patient −X. Actual LAO/CRAN axes and offsets remain a release blocker, not inferred facts.
 
 ARTIS pheno contributes only the robotic C-arm reference concept, 1.30 m maximum source-to-image distance and 0.955 m usable clearance. Those are reference-product specifications, not complete collision geometry. The detector's published active field is not its external housing size. Our two-link/five-axis robot and fixed table deliberately differ from the manufacturer's mechanism and multi-tilt table. [Siemens ARTIS pheno specifications](https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno), [Siemens system overview](https://academy.siemens-healthineers.com/_/en-us/artis-pheno-system-overview-us/).
 
@@ -500,13 +502,13 @@ a 100 ms simulator dispatch/scheduling reserve. Host scheduling is not a hard
 real-time guarantee. With v=0.20 m/s, possible a=0.40 m/s², braking b=0.50 m/s²:
 
 ```text
-v_brake = v + a*T = 0.30 m/s
-reaction_travel = v*T + 0.5*a*T² = 0.0625 m
-braking_travel = v_brake²/(2*b) = 0.0900 m
-total = 0.1525 m
+v_brake = min(v_max, v + a*T) = 0.20 m/s
+reaction_travel = v_max*T = 0.0500 m
+braking_travel = v_brake²/(2*b) = 0.0400 m
+total = 0.0900 m
 ```
 
-The additional pair margin is 0.020 m. Angular prediction uses its own speed,
+The additional residual pair margin is 0.010 m. Angular prediction uses its own speed,
 acceleration and braking bounds. Without measured velocity the worker assumes
 configured maximum speed, so some tilt commands can be denied already at
 preflight even though their immediate first step would be clear. This is
@@ -840,7 +842,7 @@ unbounded logging. CAN output uses bounded queues; failure to publish required
 control/feedback state stops the affected session. UI rendering cannot delay
 drive or collision execution.
 
-Prediction retains the 250 ms reaction allowance and 20 mm model margin from
+Prediction retains the 250 ms reaction allowance and 10 mm residual margin from
 section 17.4. It covers speed, possible acceleration, braking distance and swept
 volumes of every relevant body, including rotational corner motion. For each
 renewal, cover the next allowed segment and its worst-case stop. Unknown or

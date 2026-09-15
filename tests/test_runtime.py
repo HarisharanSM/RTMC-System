@@ -99,10 +99,15 @@ def run(binary):
                 check(b'<canvas id="carm-view"' in dashboard and b'<iframe' not in dashboard and
                       b"drive_can_feedback" in dashboard,
                       "index contains the CAN-driven C-arm canvas without an iframe")
+                check(b"10 mm residual gap" in dashboard and b"CRAN/CAUD" in dashboard,
+                      "index displays the revised clearance and angular-limit policy")
             with urllib.request.urlopen(URL+"/model/parameters.json") as reply:
                 model=json.load(reply)
                 check(model["kinematics"]["home_deg"]==[-180,180,0,0,0],
                       "integrated renderer receives the five-axis head-aligned model")
+                check(model["kinematics"]["joint_limits_deg"][4]==[-90,90] and
+                      model["simulation_pair_margin_m"]==.01,
+                      "runtime serves the A5 and 10 mm collision policy")
             with urllib.request.urlopen(URL+"/model/scene.json") as reply:
                 scene_bytes=reply.read()
                 check(len(json.loads(scene_bytes)["bodies"])>5,
@@ -146,14 +151,19 @@ def run(binary):
                     break
             else:
                 raise AssertionError("No avoidance stop on approach to fixed table pedestal")
-            # Source right face is x+.19; pedestal left face is 1.50 m.
-            gap=1.50-(x_m(current)+.19)
+            # With the revised head-side construction, the support column is
+            # the first body to approach the table's head edge. Its centre is
+            # I.x-.75 and its head/foot half-width is .08; table left is -.20.
+            gap=-.20-(x_m(current)-.75+.08)
             check(current["clear_permits"]>20 and current["sequence"]>20,
                   "worker repeatedly renews permits while actual simulator moves")
             check(current["state"]=="AvoidanceLatched" and current["speed_dps"]==0 and
                   "deadline" not in current["reason"],
                   "collision predictor independently stops the running drive")
-            check(.02 < gap < .20, "source stops with positive clearance before pedestal contact")
+            print("Observed support/table predictive-stop gap: %.4f m" % gap, flush=True)
+            # The configured residual surface gap is 10 mm. Allow 0.5 mm for
+            # fixed-point CAN quantization in this end-to-end observation.
+            check(.0095 < gap < .20, "head-side support stops with at least the configured 10 mm clearance")
             sequence=current["sequence"]
             command("R-up","start")
             for _ in range(3):
@@ -170,7 +180,7 @@ def run(binary):
                     break
             check(state()["sequence"]>sequence, "fresh reverse preflight allows safe movement away")
             command("none","stop")
-            print("Observed pedestal clearance: %.3f m; X: %.3f m" % (gap,x_m(current)),flush=True)
+            print("Observed table clearance: %.3f m; X: %.3f m" % (gap,x_m(current)),flush=True)
             completed = True
         except Exception:
             log.seek(0)

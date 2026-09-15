@@ -509,6 +509,19 @@ void UC6_AngularAxes() {
     AndThen(Near(run.finalPos.LAO, A4_MAX_DEG, 1e-9),
             "LAO saturates exactly at its limit rather than stalling early");
     EndScenario();
+
+    Scenario("KIN-25", "CRAN/CAUD clamp at 90 degrees in either direction");
+    Given("CRAN and CAUD are each held beyond their configured travel");
+    cDriveCalculator cranCalculator;
+    cDriveCalculator caudCalculator;
+    const RunTrace cran = Drive(cranCalculator, Pos(100, 0), Sig(0, 0, 0, 1), 200);
+    const RunTrace caud = Drive(caudCalculator, Pos(100, 0), Sig(0, 0, 0, -1), 200);
+    When("the final CRAN/CAUD positions are inspected");
+    Then(Near(cran.finalPos.CRAN, A5_MAX_DEG, 1e-9),
+         "CRAN saturates exactly at +90 deg");
+    AndThen(Near(caud.finalPos.CRAN, A5_MIN_DEG, 1e-9),
+            "CAUD saturates exactly at -90 deg");
+    EndScenario();
 }
 
 // ---------------------------------------------------------------------------

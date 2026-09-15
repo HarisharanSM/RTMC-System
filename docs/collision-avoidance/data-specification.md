@@ -65,11 +65,11 @@ Each box has `center_m`, positive full `size_m` and `rotation_x_rad` relative to
 | Link center-to-center lengths | 0.75 m / 1.00 m | RTMC geometry constants |
 | Base planar position | (-0.25,0) m | Derived from RTMC closed-pose convention |
 | A1 / A2 travel | [-180,10]° / [0,180]° | Existing assumed software limits, not measured stops |
-| A3 / A4 / A5 travel | [-180,180]° each | Existing assumed software limits |
+| A3 / A4 / A5 travel | [-180,180]° / [-180,180]° / [-90,90]° | Assumed software limits; A5 revised for CRAN/CAUD |
 | EOF command envelope | X=[0,1.5], Y=[-0.25,0.25] m | RTMC software envelope |
 | Reference SID | 1.30 m | Published ARTIS pheno maximum; marker-to-marker distance in synthetic C-arm |
 | Reference usable clearance | 0.955 m | Published ARTIS pheno value; matched by synthetic housing faces |
-| Link 1 / link 2 center heights | 0.43 / 0.68 m | Synthetic, avoids representing folded links as coplanar solids |
+| Link 1 / link 2 center heights | 0.10 / 0.28 m | Synthetic under-table construction supporting the head-side mount |
 | Isocenter height | 1.20 m | Synthetic fixed height |
 | Base enclosure | 0.55 × 0.60 × 0.35 m | Synthetic |
 | Link 1 / link 2 cross-sections | 0.20 × 0.16 / 0.16 × 0.14 m | Synthetic rectangular proxies |
@@ -82,7 +82,7 @@ Each box has `center_m`, positive full `size_m` and `rotation_x_rad` relative to
 | Mattress | 2.00 × 0.53 × 0.05 m | Synthetic |
 | Patient test box | Torso 1.68 × 0.50 × 0.30 m centered at (0.96,0,1.15); head 0.24 m cube at (0,0,1.20) | Artificial test volume; not human clearance coverage |
 | Floor extent | 6.00 × 5.00 × 0.10 m, top at Z=0 | Synthetic visual/obstacle fixture; no complete room model |
-| Pair clearance margin | 0.020 m | Illustrative simulation value only |
+| Pair clearance margin | 0.010 m | One nominal full-speed linear step; illustrative simulation value only |
 
 Reference source: [Siemens ARTIS pheno technical specifications](https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno), consulted 2026-09-14. This source does not provide the synthetic housing or table dimensions in this dataset. The manufacturer's multi-tilt table is not modeled; the user-requested fixed table has no degrees of freedom.
 
@@ -106,7 +106,7 @@ All collision-enabled robot bodies must be tested against table, patient exclusi
 
 The scene metadata prescribes reviewed local contact masks. The current simulator still excludes entire synthetic interface pairs: link1/link2, link2/alignment, alignment/carm and legacy link2/carm. These exclusions are visible implementation limits and cannot establish physical self-collision protection. Intended bearing connections and permanent floor supports need reviewed local allowed-contact masks. Joint housings in the dataset are simplified and may produce expected overlaps. A consumer must not silently disable all adjacent pairs to make a preview appear clear. Static support contacts should be distinguished from forbidden assembly overlaps at scene validation.
 
-The runtime pair margin must account for both bodies' geometry error, registration, encoder/tracking bounds, interpolation/numerical errors and any deformation reserve. Timing motion belongs in the reachable tube; avoid counting it twice in a static margin. Unknown uncertainty cannot be interpreted as zero. Mesh vertices do not already contain the illustrative 20 mm margin; apply it once per pair according to the runtime contract.
+The runtime pair margin must account for both bodies' geometry error, registration, encoder/tracking bounds, interpolation/numerical errors and any deformation reserve. Timing motion belongs in the reachable tube; avoid counting it twice in a static margin. Unknown uncertainty cannot be interpreted as zero. Mesh vertices do not already contain the illustrative 10 mm margin; apply it once per pair according to the runtime contract.
 
 ## Asset replacement and dynamic migration
 

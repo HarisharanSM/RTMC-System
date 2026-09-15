@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "model_id": "rtmc-head-aligned-five-axis-v2",
+  "schema_version": 3,
+  "model_id": "rtmc-head-side-five-axis-v3",
   "status": "simulation_only",
   "hardware_authorization": false,
   "units": {
@@ -64,8 +64,8 @@
         180
       ],
       [
-        -180,
-        180
+        -90,
+        90
       ]
     ],
     "home_deg": [
@@ -85,10 +85,11 @@
         0.25
       ]
     ],
-    "link1_center_z_m": 0.43,
-    "link2_center_z_m": 0.68,
+    "link1_center_z_m": 0.1,
+    "link2_center_z_m": 0.28,
     "isocenter_z_m": 1.2,
-    "carm_rotation": "Rz(A1+A2+A3) * Ry(A4) * Rx(A5); A3=-(A1+A2)"
+    "mount_rotation_deg": -90,
+    "carm_rotation": "Rz(A1+A2+A3) * Rx(A4) * Ry(A5); support uses Rz(-90deg); A3=-(A1+A2)"
   },
   "robot": {
     "base_size_m": [
@@ -109,7 +110,7 @@
       0.24,
       0.25
     ],
-    "support_rear_offset_m": 0.9,
+    "support_rear_offset_m": 0.75,
     "support_width_m": 0.16,
     "support_height_m": 0.16,
     "carm_inner_radius_m": 0.7,
@@ -209,7 +210,7 @@
       0.24
     ]
   },
-  "simulation_pair_margin_m": 0.02,
+  "simulation_pair_margin_m": 0.01,
   "braking_profile": {
     "status": "missing_machine_measurements",
     "guaranteed_joint_deceleration_rad_s2": null,

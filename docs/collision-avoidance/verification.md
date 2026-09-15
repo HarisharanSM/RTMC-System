@@ -1,6 +1,6 @@
 # Design and implementation verification
 
-Date: 2026-09-14. Scope: C++ simulation collision module, five-axis drive
+Date: 2026-09-15. Scope: C++ simulation collision module, five-axis drive
 integration, reproducible synthetic geometry, integrated joystick/C-arm runtime and
 fail-closed startup checks. No hardware test or physical safety release is
 claimed.
@@ -19,6 +19,12 @@ claimed.
 | Real `pcan_demo` runtime acceptance | 21 checks passed | Integrated canvas/model hashes, versioned UI CAN/session lifecycle, coherent drive CAN feedback, movement, watchdog, predictive stop, latch, Stop and safe reverse verified |
 | Observed synthetic pedestal stop | 0.167 m source-to-pedestal clearance at X=1.143 m | Positive clearance remained when the predictive collision latch stopped commanded motion |
 | Fail-closed startup acceptance | Passed | Missing assets and occupied port return failure; SIGTERM performs supervised clean shutdown |
+| Revision-4 reference artifacts | 12 tests passed; 14 files reproduce | Head-side support, A5 limits, 10 mm policy, frames, enclosure and hashes agree |
+| Revision-4 kinematics | 25/25 scenarios; 58/58 checks passed | Existing kinematics plus exact CRAN +90° and CAUD −90° saturation |
+| Revision-4 collision suite | Passed | 11 mm closest-feature distance, 9/10/11 mm policy, speed-capped horizons, head-side support and bilateral home LAO/RAO preflight |
+| Revision-4 real runtime | 22 checks passed | Actual executable preserved CAN feedback, watchdog, predictive stop/latch, safe reverse and clean SIGTERM |
+| Observed revision-4 stop | 0.0966 m support-to-table gap at X=0.373 m | Corrected head-side column becomes the first limiting pair; stop retains more than the required 10 mm residual gap |
+| Integrated display inspection | Passed | Canvas visibly places the support on the head side and shows coherent A1–A5 drive CAN feedback; no iframe |
 
 The live dashboard was fetched from the running application and inspected in the
 browser. It contains the C-arm canvas, patient-head reference, all five axle

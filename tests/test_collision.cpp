@@ -93,6 +93,11 @@ void TestProximity() {
           "rotated separated boxes have a positive SAT gap");
     b.center = {.2, 0, 0};
     Check(proximity.Separation(a, b).overlapping, "overlapping rotated boxes are detected");
+
+    OrientedBox c{{0, 0, 0}, {.05, .05, .05}, Mat3{}, &bodyA};
+    OrientedBox d{{.111, 0, 0}, {.05, .05, .05}, Mat3{}, &bodyB};
+    Check(std::abs(proximity.SurfaceDistance(c, d) - .011) < 1e-12,
+          "3D closest-feature distance reports an 11 mm surface gap");
 }
 
 void TestStartDirectionProtocol() {
@@ -143,14 +148,31 @@ void TestPrediction() {
     const CollisionPermit clear = clearPredictor.Predict(Request(clearScene, Direction(1, 0, 0, 0)));
     Check(clear.verdict == eCollisionVerdict::Clear,
           "far obstacle is clear through reaction and braking path");
-    Check(std::abs(clear.predictedTravelM - .1525) < 1e-10,
-          "prediction includes 152.5 mm of worst-case linear travel");
+    Check(std::abs(clear.predictedTravelM - .09) < 1e-10,
+          "speed-capped prediction includes 90 mm of worst-case linear travel");
     CollisionRequest measured = Request(clearScene, Direction(1, 0, 0, 0));
     measured.velocityMeasured = true;
     measured.linearSpeedMps = 0.0;
     const CollisionPermit measuredPermit = clearPredictor.Predict(measured);
     Check(std::abs(measuredPermit.predictedTravelM - .0225) < 1e-10,
           "bounded measured speed is used when feedback is explicitly marked measured");
+
+    PredictionSettings staticSettings{};
+    staticSettings.reactionTimeS = 0.0;
+    staticSettings.maximumLinearSpeedMps = 0.0;
+    staticSettings.maximumLinearAccelerationMps2 = 0.0;
+    staticSettings.maximumAngularSpeedRadps = 0.0;
+    staticSettings.maximumAngularAccelerationRadps2 = 0.0;
+    bool gapPolicy = true;
+    for (const double gap : {.009, .010, .011}) {
+        const auto scene = ProbeScene({.10 + gap, 0, 1.2}, {.10, .10, .10});
+        cTrajectoryPredictor predictor(scene, staticSettings);
+        CollisionRequest request = Request(scene, Direction(1, 0, 0, 0));
+        request.linearSpeedMps = request.angularSpeedRadps = 0.0;
+        const bool clear = predictor.Predict(request).verdict == eCollisionVerdict::Clear;
+        gapPolicy &= clear == (gap > .010);
+    }
+    Check(gapPolicy, "10 mm residual gap denies 9 mm/equality and accepts 11 mm");
 
     const auto hazardScene = ProbeScene({.145, 0, 1.2}, {.02, .40, .40});
     cTrajectoryPredictor hazardPredictor(hazardScene);
@@ -320,6 +342,29 @@ void TestFiveAxisHeadFrame() {
     CollisionBody centered{"probe","probe",eBodyFrame::CArm,{0,0,0},{.6,.4,.3},0,false};
     Check(kinematics.BoundBodyMotion(centered,{-180,180,0,0,0},{-180,180,0,0,30})>.1,
           "A5 sweep bounds include box corners even when center is stationary");
+
+    const auto scene = cSceneRegistry::CreateReferenceScene(true);
+    bool headSideSupport = false;
+    for (const CollisionBody& body : scene.Bodies()) {
+        if (body.id != "support_column") continue;
+        const AxelPostion homeAxles{-180,180,0,0,0};
+        const OrientedBox column = kinematics.CalculateBox(body, homeAxles);
+        headSideSupport = column.center.x < -.70 && std::abs(column.center.y) < 1e-12;
+    }
+    Check(headSideSupport, "neutral C-arm support column is on the patient head side (-X)");
+
+    cTrajectoryPredictor predictor(scene);
+    bool centralRotationClear = true;
+    for (const double x : {0.0, 10.0, 20.0, 30.0}) {
+        for (const double sign : {-1.0, 1.0}) {
+            CollisionRequest request = Request(scene, Direction(0,0,sign,0));
+            request.currentPosition.X = x;
+            calculator.CalculateInverseKinematics(request.currentPosition, request.currentAxles);
+            centralRotationClear &= predictor.Predict(request).verdict == eCollisionVerdict::Clear;
+        }
+    }
+    Check(centralRotationClear,
+          "central workspace preflight permits both LAO and RAO at representative X positions");
 }
 
 void TestMissingRenewal() {

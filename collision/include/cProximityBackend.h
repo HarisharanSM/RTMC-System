@@ -12,6 +12,7 @@ struct SeparationResult {
 class cProximityBackend {
 public:
     SeparationResult Separation(const OrientedBox& lhs, const OrientedBox& rhs) const;
+    double SurfaceDistance(const OrientedBox& lhs, const OrientedBox& rhs) const;
 };
 
 } // namespace RTMCCollision

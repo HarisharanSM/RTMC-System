@@ -47,7 +47,7 @@
     <label>A2 · relative elbow <output id="o1"></output><input id="q1" aria-label="A2 relative elbow angle" type="range" min="0" max="180" step="1" value="180"></label>
     <label>A3 · automatic alignment <output id="o2"></output><input id="q2" type="range" min="-180" max="180" step="any" value="0" disabled></label>
     <label>A4 · LAO <output id="o3"></output><input id="q3" aria-label="A4 LAO angle" type="range" min="-180" max="180" step="any" value="0"></label>
-    <label>A5 · CRAN <output id="o4"></output><input id="q4" aria-label="A5 CRAN angle" type="range" min="-180" max="180" step="any" value="0"></label>
+    <label>A5 · CRAN <output id="o4"></output><input id="q4" aria-label="A5 CRAN angle" type="range" min="-90" max="90" step="any" value="0"></label>
     <div id="position"></div>
     <h2>Geometry layers</h2>
     <div class="legend">
@@ -76,10 +76,10 @@ function frames(q) {
   const k=P.kinematics,[a,b,c,d,e5]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
   const e=[x+k.link1_m*Math.cos(a),y+k.link1_m*Math.sin(a)];
   const f=[e[0]+k.link2_m*Math.cos(a+b),e[1]+k.link2_m*Math.sin(a+b)];
-  const h=rot('z',a+b), aligned=rot('z',a+b+c);
+  const h=rot('z',a+b), aligned=rot('z',a+b+c), mount=rot('z',k.mount_rotation_deg*Math.PI/180);
   return {world:identity(),link1:mul(tr(x,y,k.link1_center_z_m),rot('z',a)),
-    link2:mul(tr(...e,k.link2_center_z_m),h),eof_support:mul(tr(...f,k.link2_center_z_m),aligned),
-    carm:mul(mul(mul(tr(...f,k.isocenter_z_m),aligned),rot('y',d)),rot('x',e5))};
+    link2:mul(tr(...e,k.link2_center_z_m),h),eof_support:mul(mul(tr(...f,k.link2_center_z_m),aligned),mount),
+    carm:mul(mul(mul(tr(...f,k.isocenter_z_m),aligned),rot('x',d)),rot('y',e5))};
 }
 function project(p,w,h) {
   const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw);

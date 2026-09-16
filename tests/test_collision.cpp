@@ -207,7 +207,8 @@ void TestReferenceScene() {
     const auto elapsed = std::chrono::steady_clock::now() - started;
     std::cout << "[INFO] reference home +X verdict=" << ToString(permit.verdict)
               << " pair=" << permit.movingBody << "/" << permit.obstacle
-              << " reason=" << permit.reason << "\n";
+              << " reason=" << permit.reason << " elapsed_us="
+              << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << "\n";
     Check(scene.IsValid(), "compiled reference scene has valid IDs, dimensions and frames");
     Check(permit.verdict == eCollisionVerdict::Clear,
           "closed-pose +X preflight is clear in the supplied simulation scene");
@@ -360,7 +361,14 @@ void TestFiveAxisHeadFrame() {
             CollisionRequest request = Request(scene, Direction(0,0,sign,0));
             request.currentPosition.X = x;
             calculator.CalculateInverseKinematics(request.currentPosition, request.currentAxles);
-            centralRotationClear &= predictor.Predict(request).verdict == eCollisionVerdict::Clear;
+            const auto permit = predictor.Predict(request);
+            if (permit.verdict != eCollisionVerdict::Clear) {
+                std::cout << "[INFO] angular preflight X=" << x << " sign=" << sign
+                          << " verdict=" << ToString(permit.verdict) << " pair="
+                          << permit.movingBody << "/" << permit.obstacle
+                          << " reason=" << permit.reason << "\n";
+                centralRotationClear = false;
+            }
         }
     }
     Check(centralRotationClear,

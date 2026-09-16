@@ -1,6 +1,6 @@
 # Static 3D reference dataset
 
-Revision 2, 2026-09-14. Read with [the avoidance architecture](architecture.md).
+Revision 5, 2026-09-16. Read with [the avoidance architecture](architecture.md).
 
 ## Purpose and limitations
 
@@ -17,8 +17,12 @@ The reference can support scene loading, transform development, broad/narrow-pha
 | `generated/frames/world.obj` | Fixed table, base, floor and optional patient test envelope, in world coordinates |
 | `generated/frames/link1.obj` | Link 1 and elbow housing in link-1 coordinates |
 | `generated/frames/link2.obj` | Link 2 in elbow coordinates |
-| `generated/frames/eof_support.obj` | Rear support in EOF support coordinates; rotated by the A3 alignment joint |
+| `generated/frames/column.obj` | Column and A3 stator geometry at the physical link-2 endpoint |
+| `generated/frames/boom.obj` | Compensated A3 rotor, upper boom and A4 bearing geometry |
+| `generated/frames/a4_carrier.obj` | Synthetic remote-centre carrier and A5 bearing geometry |
+| `generated/frames/a5_carrier.obj` | Reserved downstream carrier frame |
 | `generated/frames/carm.obj` | Compound C-arm sectors, detector and source in isocenter coordinates |
+| `generated/scene_data.inc` | Generated typed C++ body and pair-policy records used by the runtime |
 | `generated/poses/{home,extended,oblique}.json` | Joint angles and world transforms for reproducible snapshots |
 | `generated/poses/{home,extended,oblique}.obj` | Assembled world-coordinate snapshots for CAD viewers |
 | `generated/viewer.html` | Offline interactive model viewer; orbit/zoom, pose presets and five axle readouts; A3 is automatic |
@@ -40,30 +44,34 @@ Generation requires Python's standard library only and does not modify drive cod
 
 Use column vectors; matrices are row-major JSON arrays. `p_world = T_world_frame * p_frame`. Angles in the scene and transforms are radians; parameter keys ending `_deg` and preview joint values are explicitly degrees. Dimensions ending `_m` are meters.
 
-World X/Y preserve the existing planar command frame and world Z points up. At closed pose, A1=-180°, A2=180°, EOF X/Y=(0,0). Robot base X/Y=(-0.25,0). The joint-2 angle is relative to link 1. Fixed table's longitudinal axis is world X. The prototype has no Z-translation axis.
+World X/Y report imaging-centre displacement from the initial patient head and world Z points up. The legacy planar calculation frame K retains base (-0.25,0), but `T_W_K` translates it by (-1.15,0) m so the physical column can remain headward while the imaging centre is at X/Y=(0,0). The joint-2 angle is relative to link 1. Fixed table's longitudinal axis is world X. The prototype has no Z-translation axis.
 
 With `B=(-0.25,0)`, lengths L1=0.75 and L2=1.00, and q in radians:
 
 ```text
-E = B + [L1*cos(q1), L1*sin(q1)]
-F = E + [L2*cos(q1+q2), L2*sin(q1+q2)]
-T_W_link1   = Trans(B.x, B.y, 0.43) * Rz(q1)
-T_W_link2   = Trans(E.x, E.y, 0.68) * Rz(q1+q2)
+E_K = B_K + [L1*cos(q1), L1*sin(q1)]
+M_K = E_K + [L2*cos(q1+q2), L2*sin(q1+q2)]
+E_W = E_K + [-1.15,0]
+M_W = M_K + [-1.15,0]
+T_W_link1   = Trans(B_K.x-1.15, B_K.y, 0.10) * Rz(q1)
+T_W_link2   = Trans(E_W.x, E_W.y, 0.28) * Rz(q1+q2)
 q3 = -(q1+q2)
-T_W_support = Trans(F.x, F.y, 0.68) * Rz(q1+q2+q3)
-T_W_carm    = Trans(F.x, F.y, 1.20) * Rz(q1+q2+q3) * Ry(q4) * Rx(q5)
+T_W_column  = Trans(M_W.x, M_W.y, 0.37) * Rz(q1+q2)
+T_W_boom    = Trans(M_W.x, M_W.y, 1.20) * Rz(q1+q2+q3)
+I_W         = T_W_boom * [1.15,0,0]
+T_W_carm    = Trans(I_W) * Rz(q1+q2+q3) * Rx(q4) * Ry(q5)
 ```
 
-The last two rotation axes and all Z offsets are assumptions. Do not infer actual LAO/CRAN sign, order or pivot from this model. The support is carried by A3 and has rigid-body ID `alignment`; the C-arm rotates about the imaging center through A4/A5. A3 has an axis parallel to A1/A2, through the link-2 endpoint, not the base's spatial center. Mount/bearing detail is omitted. Measurements must replace that interface before physically meaningful self-collision checks.
+The last two rotation axes, carrier construction and all Z offsets are assumptions. Do not infer actual LAO/CRAN sign, order or pivot from this model. The column follows A1+A2; A3 compensates the boom heading; the synthetic carrier rotates the C-arm about the imaging centre. Measurements must replace that interface before physically meaningful self-collision checks.
 
-Each box has `center_m`, positive full `size_m` and `rotation_x_rad` relative to its frame. Its local transform is `Trans(center) * Rx(rotation_x_rad)`. Each body has a stable unique ID, rigid-body ID, mobility and `collision_enabled=true`.
+Each box has `center_m`, positive full `size_m` and X/Y/Z local rotations relative to its frame. Its local transform is `Trans(center) * Rx * Ry * Rz`. Each body has a stable unique ID, rigid-body ID, mobility and `collision_enabled=true`.
 
 ## Dimension and provenance register
 
 | Item | Value | Provenance |
 | --- | --- | --- |
 | Link center-to-center lengths | 0.75 m / 1.00 m | RTMC geometry constants |
-| Base planar position | (-0.25,0) m | Derived from RTMC closed-pose convention |
+| Base planar position | K=(-0.25,0) m; world=(-1.40,0) m | Existing solve plus explicit -1.15 m registration |
 | A1 / A2 travel | [-180,10]° / [0,180]° | Existing assumed software limits, not measured stops |
 | A3 / A4 / A5 travel | [-180,180]° / [-180,180]° / [-90,90]° | Assumed software limits; A5 revised for CRAN/CAUD |
 | EOF command envelope | X=[0,1.5], Y=[-0.25,0.25] m | RTMC software envelope |
@@ -71,9 +79,10 @@ Each box has `center_m`, positive full `size_m` and `rotation_x_rad` relative to
 | Reference usable clearance | 0.955 m | Published ARTIS pheno value; matched by synthetic housing faces |
 | Link 1 / link 2 center heights | 0.10 / 0.28 m | Synthetic under-table construction supporting the head-side mount |
 | Isocenter height | 1.20 m | Synthetic fixed height |
-| Base enclosure | 0.55 × 0.60 × 0.35 m | Synthetic |
+| Column / upper boom | 0.18 m square × 0.83 m; 0.31 m × 0.18 m square | Synthetic drawing-based proxies |
+| Base enclosure | 0.55 × 0.60 × 0.25 m | Synthetic |
 | Link 1 / link 2 cross-sections | 0.20 × 0.16 / 0.16 × 0.14 m | Synthetic rectangular proxies |
-| C-arm arc | Inner radius 0.70 m; outer 0.84 m; X-depth 0.22 m | Synthetic half-annulus, 24 conservative box sectors |
+| C-arm arc | Inner radius 0.70 m; outer 0.84 m; Y-depth 0.22 m | Synthetic XZ half-annulus, 8 conservative box sectors |
 | Detector housing | 0.48 × 0.42 × 0.245 m | Synthetic exterior; not detector active field |
 | Source housing | 0.38 × 0.40 × 0.285 m | Synthetic exterior |
 | Fixed table top | 2.20 × 0.55 × 0.10 m; center (0.90,0,0.90) m | Synthetic installation and table |
@@ -90,7 +99,7 @@ Source focal marker is at local Z=-0.65 m and detector image marker at +0.65 m. 
 
 ## Conservative C-arm representation
 
-The analytic reference is an annular sector in local Y/Z, 90° to 270°, extruded along X. Its opening faces +Y. For a segment midpoint angle theta and angular half-width h:
+The analytic reference is an annular sector in local X/Z, 90° to 270°, extruded along Y. Its opening faces +X toward the table. For a segment midpoint angle theta and angular half-width h:
 
 ```text
 radial_min = inner_radius * cos(h)
@@ -98,13 +107,11 @@ radial_max = outer_radius
 tangent_min/max = +/-outer_radius * sin(h)
 ```
 
-These extrema define an oriented box rotated by theta about X. It encloses the full analytic sector rather than a chord that cuts through it. Neighboring boxes may overlap. Unit tests sample radial/angular/depth points as a regression check; the formula provides the enclosure argument. This proves enclosure of the synthetic half-annulus only. No bound relating it to a physical product is known.
+These extrema define an oriented box rotated by -theta about Y. It encloses the full analytic sector rather than a chord that cuts through it. Neighboring boxes may overlap. Unit tests sample radial/angular/depth points as a regression check; the formula provides the enclosure argument. This proves enclosure of the synthetic half-annulus only. No bound relating it to a physical product is known.
 
 ## Collision pair policy
 
-All collision-enabled robot bodies must be tested against table, patient exclusion volume, floor and other scene obstacles; robot inter-body pairs remain enabled. Skip internal primitives with the same rigid-body ID. The source, detector and arc sectors share the C-arm rigid-body ID; support is `alignment`, and link 2 is `link2`.
-
-The scene metadata prescribes reviewed local contact masks. The current simulator still excludes entire synthetic interface pairs: link1/link2, link2/alignment, alignment/carm and legacy link2/carm. These exclusions are visible implementation limits and cannot establish physical self-collision protection. Intended bearing connections and permanent floor supports need reviewed local allowed-contact masks. Joint housings in the dataset are simplified and may produce expected overlaps. A consumer must not silently disable all adjacent pairs to make a preview appear clear. Static support contacts should be distinguished from forbidden assembly overlaps at scene validation.
+All collision-enabled robot bodies must be tested against table, patient exclusion volume, floor and other scene obstacles; robot inter-body pairs remain enabled. Skip internal primitives with the same rigid-body ID. Eight explicit synthetic bearing/interface pair exclusions are generated into both scene metadata and typed C++ data. They are an implementation limitation, not physical self-collision evidence. Measured geometry still requires reviewed local allowed-contact masks.
 
 The runtime pair margin must account for both bodies' geometry error, registration, encoder/tracking bounds, interpolation/numerical errors and any deformation reserve. Timing motion belongs in the reachable tube; avoid counting it twice in a static margin. Unknown uncertainty cannot be interpreted as zero. Mesh vertices do not already contain the illustrative 10 mm margin; apply it once per pair according to the runtime contract.
 
@@ -127,7 +134,7 @@ Future tracked obstacles reuse geometry and IDs but obtain a dynamic motion sour
 
 The fixed reference head center is H=(0,0,1.20) m. The torso begins at X=0.12 m
 and extends toward +X. The head is a distinct collision-enabled static body.
-Home F=(0,0) therefore places the imaging pivot at the head center rather than
+Home I=(0,0) therefore places the imaging pivot at the head center rather than
 at an arbitrary table-side offset. Both references remain visible in the viewer
 after translation: the head stays fixed and the imaging center moves.
 

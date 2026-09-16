@@ -1,6 +1,6 @@
 # Design and implementation verification
 
-Date: 2026-09-15. Scope: C++ simulation collision module, five-axis drive
+Date: 2026-09-16. Scope: C++ simulation collision module, five-axis drive
 integration, reproducible synthetic geometry, integrated joystick/C-arm runtime and
 fail-closed startup checks. No hardware test or physical safety release is
 claimed.
@@ -25,6 +25,10 @@ claimed.
 | Revision-4 real runtime | 22 checks passed | Actual executable preserved CAN feedback, watchdog, predictive stop/latch, safe reverse and clean SIGTERM |
 | Observed revision-4 stop | 0.0966 m support-to-table gap at X=0.373 m | Corrected head-side column becomes the first limiting pair; stop retains more than the required 10 mm residual gap |
 | Integrated display inspection | Passed | Canvas visibly places the support on the head side and shows coherent A1–A5 drive CAN feedback; no iframe |
+| Revision-5 generated model | 18 files reproduce; 12 tests passed | Eight-frame drawing topology, XZ C-arm, registered head origin, carrier geometry, OBJ closure, hashes and typed scene data agree |
+| Revision-5 collision suite | 42 checks passed | Generated scene/pair policy, 3D prediction, 10 mm rule, bilateral LAO/RAO, asynchronous permits and stop latch pass |
+| Revision-5 real runtime | 24 checks passed | Actual executable serves the model, uses drive CAN feedback, reports the limiting pair, stops predictively, latches and safely rearms |
+| Observed revision-5 stop | 0.0819 m `carm_sector_05`/`table_top` current-pose gap | The reported limiting pair retained more than the 10 mm residual gap when commanded motion stopped |
 
 The live dashboard was fetched from the running application and inspected in the
 browser. It contains the C-arm canvas, patient-head reference, all five axle

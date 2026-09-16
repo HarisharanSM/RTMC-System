@@ -8,7 +8,7 @@ namespace RTMCCollision {
 
 class cBodyKinematics {
 public:
-    using FrameTransforms = std::array<Transform3, 5>;
+    using FrameTransforms = std::array<Transform3, 8>;
 
     FrameTransforms CalculateFrames(const AxelPostion& axles) const;
     OrientedBox CalculateBox(const CollisionBody& body, const AxelPostion& axles) const;

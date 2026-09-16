@@ -32,7 +32,10 @@ enum class eBodyFrame {
     World,
     Link1,
     Link2,
-    EofSupport,
+    Column,
+    Boom,
+    A4Carrier,
+    A5Carrier,
     CArm
 };
 
@@ -44,6 +47,8 @@ struct CollisionBody {
     Vec3 size{};
     double rotationXRad = 0.0;
     bool obstacle = false;
+    double rotationYRad = 0.0;
+    double rotationZRad = 0.0;
 };
 
 struct OrientedBox {

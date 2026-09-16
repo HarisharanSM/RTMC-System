@@ -1,5 +1,13 @@
 # Predictive collision avoidance for RTMC-System
 
+**Implemented simulation design — revision 5, drawings-based:**
+[Assembly, collision architecture and implementation plan](diagram-assembly-design.md)
+defines the column at the link-2 endpoint, upper A3 joint, head-side boom and
+longitudinal C-arm shown in the supplied side/back/top sketches. The synthetic
+frame chain, generated runtime scene, integrated display and runtime acceptance
+checks implement this topology. Undimensioned carrier details remain provisional
+and the result remains simulation-only.
+
 Design revision 3 — 2026-09-14. Repository baseline: `ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690`.
 
 **Revision 4 — 2026-09-15:** [Head-side C-arm, angular limits and clearance redesign](head-side-clearance-design.md) analyses the four reported issues and specifies the implemented simulation geometry, predictive avoidance changes, runtime integration and acceptance tests. Physical calibration and release evidence remain open.

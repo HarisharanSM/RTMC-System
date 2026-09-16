@@ -33,6 +33,9 @@ void cCollisionSupervisor::Stop() {
 
 void cCollisionSupervisor::BeginSession(std::uint64_t session) {
     m_Results.Drain();
+    m_StopReason.store("Collision worker revoked motion", std::memory_order_release);
+    m_StopMovingBody.store("", std::memory_order_release);
+    m_StopObstacle.store("", std::memory_order_release);
     m_StopSession.store(0, std::memory_order_release);
     m_ActiveSession.store(session, std::memory_order_release);
 }
@@ -98,6 +101,8 @@ void cCollisionSupervisor::WorkerLoop() {
         if (request.session != m_ActiveSession.load(std::memory_order_acquire)) continue;
         if (result.verdict != eCollisionVerdict::Clear) {
             m_StopReason.store(result.reason, std::memory_order_release);
+            m_StopMovingBody.store(result.movingBody, std::memory_order_release);
+            m_StopObstacle.store(result.obstacle, std::memory_order_release);
             RequestStop(request.session);
         }
         if (!m_Results.Push(result)) RequestStop(request.session);

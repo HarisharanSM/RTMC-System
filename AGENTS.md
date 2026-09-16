@@ -6,6 +6,7 @@
 - `drive/include/cDriveCalculator.h` is the current geometry authority: 75/100 cm links, base=(-25,0) cm, A2 relative to A1, closed EOF=(0,0) aligned to the initial patient head. A3=-(A1+A2) compensates mount yaw; A4=LAO and A5=CRAN. Legacy positions use cm and angles use degrees.
 - Read `docs/kinematics-model.md` and `docs/kinematics-bdd.md` before changing drive behavior. Preserve accepted-pose/angle agreement and the existing kinematic tests.
 - `collision/` implements simulation-only predictive avoidance following `docs/collision-avoidance/architecture.md`; current coverage and limitations are in `docs/collision-avoidance/implementation.md`. Do not describe it as providing released physical collision protection.
+- Revision-5 collision geometry uses a K-to-world X translation of -1.15 m, then distinct `Column`, `Boom`, `A4Carrier`, `A5Carrier` and `CArm` frames. The neutral C is in XZ and opens toward +X. These synthetic dimensions and the remote-centre carrier are provisional.
 
 ## Build and tests
 
@@ -24,6 +25,7 @@ If CMake is unavailable, the test sources are listed in `CMakeLists.txt` and can
 ## Reference assets
 
 - Edit `data/collision/reference/parameters.json`, `tools/generate_collision_reference.py` or `tools/collision_reference_viewer.html`, then regenerate with `python3 tools/generate_collision_reference.py`.
+- The generator also emits `generated/scene_data.inc`, which is compiled by `cSceneRegistry`; body geometry and pair exclusions must not be duplicated manually in C++.
 - Do not hand-edit `data/collision/reference/generated/`; hashes and reproducibility checks cover these outputs. OBJ and scene geometry use meters and Z up; `_deg` fields explicitly use degrees.
 - Models are original synthetic proxies, not Siemens CAD. Preserve provenance, unknown calibration/braking fields and `simulation_only` status. A boolean metadata change is not hardware release evidence.
 - Keep source citations and assumption tables current when dimensions or transforms change. The planned collision model uses SI internally and a legacy unit adapter.

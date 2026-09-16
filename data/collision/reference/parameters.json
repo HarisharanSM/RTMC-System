@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "model_id": "rtmc-head-side-five-axis-v3",
+  "schema_version": 5,
+  "model_id": "rtmc-drawing-assembly-v5",
   "status": "simulation_only",
   "hardware_authorization": false,
   "units": {
@@ -8,10 +8,10 @@
     "angle": "rad",
     "time": "s"
   },
-  "world": "X/Y fixed to initial patient head; Z up; head isocenter (0,0,1.20) m; +X toward feet",
+  "world": "X/Y fixed to initial patient head; Z up; head isocenter (0,0,1.20) m; +X toward feet; planar K axes parallel to world",
   "provenance": {
     "repository": {
-      "revision": "ee5ef8e0e3a7f57d11cf8d8620aa985ed9a36690",
+      "revision": "927f8153369a2e7bb204955a5d3d742b717702f8",
       "paths": [
         "drive/include/cDriveCalculator.h",
         "includes/commonDrive.h"
@@ -85,17 +85,22 @@
         0.25
       ]
     ],
+    "world_from_planar_xy_m": [-1.15, 0],
     "link1_center_z_m": 0.1,
     "link2_center_z_m": 0.28,
     "isocenter_z_m": 1.2,
-    "mount_rotation_deg": -90,
-    "carm_rotation": "Rz(A1+A2+A3) * Rx(A4) * Ry(A5); support uses Rz(-90deg); A3=-(A1+A2)"
+    "column_foot_z_m": 0.37,
+    "column_height_m": 0.83,
+    "boom_to_gimbal_x_m": 0.31,
+    "gimbal_to_isocenter_x_m": 0.84,
+    "column_to_isocenter_x_m": 1.15,
+    "carm_rotation": "column follows Rz(A1+A2); boom follows Rz(A1+A2+A3); remote center C-arm uses Rz(A1+A2+A3) * Rx(A4) * Ry(A5); A3=-(A1+A2)"
   },
   "robot": {
     "base_size_m": [
       0.55,
       0.6,
-      0.35
+      0.25
     ],
     "link1_cross_section_yz_m": [
       0.2,
@@ -110,15 +115,21 @@
       0.24,
       0.25
     ],
-    "support_rear_offset_m": 0.75,
-    "support_width_m": 0.16,
-    "support_height_m": 0.16,
+    "column_cross_section_xy_m": [0.18, 0.18],
+    "boom_cross_section_yz_m": [0.18, 0.18],
+    "a3_housing_size_m": [0.24, 0.24, 0.24],
+    "a4_bearing_size_m": [0.20, 0.28, 0.28],
+    "carrier_front_x_m": -0.60,
+    "carrier_arm_size_m": [0.24, 0.10, 0.10],
+    "carrier_half_width_m": 0.32,
+    "carrier_rear_crossbar_size_m": [0.12, 0.74, 0.10],
+    "a5_bearing_size_m": [0.14, 0.14, 0.18],
     "carm_inner_radius_m": 0.7,
     "carm_outer_radius_m": 0.84,
-    "carm_depth_x_m": 0.22,
+    "carm_depth_y_m": 0.22,
     "carm_arc_start_deg": 90,
     "carm_arc_end_deg": 270,
-    "carm_segments": 24,
+    "carm_segments": 8,
     "detector_size_m": [
       0.48,
       0.42,

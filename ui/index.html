@@ -7,7 +7,7 @@
 header{padding:14px 22px;border-bottom:1px solid #2b3749;display:flex;align-items:center;justify-content:space-between}
 h1{font-size:20px;margin:0}small{color:#9badc3}.status{color:#5fdfc4;text-align:right}.layout{display:grid;grid-template-columns:minmax(500px,1fr) 350px;min-height:calc(100vh - 65px)}
 .stage{position:relative;min-height:610px}canvas{display:block;width:100%;height:100%;min-height:610px;touch-action:none}
-.view-help{position:absolute;left:18px;top:14px;color:#a9b8cb;pointer-events:none}.readout{position:absolute;left:18px;bottom:16px;background:#101b2bd9;border:1px solid #33445b;border-radius:6px;padding:8px 11px;font:12px/1.6 ui-monospace,monospace}
+.view-help{position:absolute;left:18px;top:14px;color:#a9b8cb;pointer-events:none}.view-presets{position:absolute;right:18px;top:12px;display:flex;gap:5px}.readout{position:absolute;left:18px;bottom:16px;background:#101b2bd9;border:1px solid #33445b;border-radius:6px;padding:8px 11px;font:12px/1.6 ui-monospace,monospace}
 aside{border-left:1px solid #2b3749;background:#111d2d;padding:18px}.warning{color:#ffd48c;background:#392d1c;border:1px solid #6e542e;padding:9px;border-radius:6px;font-size:12px}
 .axes{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:14px 0}.axis{background:#17273a;border:1px solid #30445c;border-radius:5px;padding:7px 3px;text-align:center}.axis b{display:block;color:#5fdfc4;font:11px system-ui}.axis span{font:11px ui-monospace,monospace}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:15px}.pad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,46px);gap:5px}.controls h2{font-size:13px;text-align:center;margin:5px 0 8px}
@@ -19,6 +19,7 @@ button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;
  <section class="stage">
   <canvas id="carm-view" aria-label="Integrated live C-arm movement display"></canvas>
   <div class="view-help">Drag to orbit · scroll to zoom · X/Y origin at patient head</div>
+  <div class="view-presets"><button data-view="side">Side</button><button data-view="back">Back</button><button data-view="top">Top</button></div>
   <div id="position" class="readout">Waiting for drive CAN feedback.</div>
  </section>
  <aside>
@@ -58,12 +59,15 @@ function rot(axis,a){const m=identity(),[i,j]={x:[1,2],y:[2,0],z:[0,1]}[axis];m[
 function point(m,p){return [0,1,2].map(i=>m[i][3]+p.reduce((s,v,j)=>s+m[i][j]*v,0));}
 function frames(q){
  const k=parameters.kinematics,[a,b,c,d,e]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
- const elbow=[x+k.link1_m*Math.cos(a),y+k.link1_m*Math.sin(a)];
- const eof=[elbow[0]+k.link2_m*Math.cos(a+b),elbow[1]+k.link2_m*Math.sin(a+b)];
- const heading=rot('z',a+b),aligned=rot('z',a+b+c),mount=rot('z',k.mount_rotation_deg*Math.PI/180);
- return {world:identity(),link1:mul(tr(x,y,k.link1_center_z_m),rot('z',a)),
-  link2:mul(tr(...elbow,k.link2_center_z_m),heading),eof_support:mul(mul(tr(...eof,k.link2_center_z_m),aligned),mount),
-  carm:mul(mul(mul(tr(...eof,k.isocenter_z_m),aligned),rot('x',d)),rot('y',e))};
+ const [wx,wy]=k.world_from_planar_xy_m;
+ const elbow=[x+wx+k.link1_m*Math.cos(a),y+wy+k.link1_m*Math.sin(a)];
+ const end=[elbow[0]+k.link2_m*Math.cos(a+b),elbow[1]+k.link2_m*Math.sin(a+b)];
+ const heading=rot('z',a+b),aligned=rot('z',a+b+c),top=tr(...end,k.isocenter_z_m);
+ const imaging=mul(mul(top,aligned),tr(k.column_to_isocenter_x_m,0,0));
+ const a4=mul(imaging,rot('x',d)),a5=mul(a4,rot('y',e));
+ return {world:identity(),link1:mul(tr(x+wx,y+wy,k.link1_center_z_m),rot('z',a)),
+  link2:mul(tr(...elbow,k.link2_center_z_m),heading),column:mul(tr(...end,k.column_foot_z_m),heading),
+  boom:mul(top,aligned),a4_carrier:a4,a5_carrier:a5,carm:a5};
 }
 function project(p,w,h){const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw),u=c*x-s*y,v=s*x+c*y;return[w/2+zoom*u,h/2-zoom*(z*Math.cos(pitch)-v*Math.sin(pitch)),v*Math.cos(pitch)+z*Math.sin(pitch)];}
 function bodyColor(b){if(b.rigid_body==='patient_fixture')return'#e1ae63';if(b.rigid_body==='fixed_table')return'#6389bd';if(b.frame==='carm')return'#c8d6e5';return'#48baa9';}
@@ -77,7 +81,8 @@ function draw(){
  const faces=[];
  for(const body of scene.bodies){
   if(body.id==='floor')continue;
-  const m=mul(f[body.frame],mul(tr(...body.center_m),rot('x',body.rotation_x_rad)));
+  const local=mul(tr(...body.center_m),mul(mul(rot('x',body.rotation_x_rad),rot('y',body.rotation_y_rad||0)),rot('z',body.rotation_z_rad||0)));
+  const m=mul(f[body.frame],local);
   const vertices=[];for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])vertices.push(project(point(m,[x*body.size_m[0]/2,y*body.size_m[1]/2,z*body.size_m[2]/2]),w,h));
   for(const face of[[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]]){const pts=face.map(i=>vertices[i]);faces.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,color:bodyColor(body),patient:body.rigid_body==='patient_fixture'});}
  }
@@ -101,6 +106,7 @@ controls.forEach(b=>{b.onpointerdown=start;b.onpointerup=stop;b.onpointercancel=
 document.getElementById('stop').onclick=stop;window.addEventListener('blur',()=>{if(active)stop();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&active)stop();});
 canvas.onpointerdown=e=>{dragging=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!dragging)return;yaw+=(e.clientX-dragging[0])*.007;pitch=Math.max(-.8,Math.min(1.4,pitch+(e.clientY-dragging[1])*.007));dragging=[e.clientX,e.clientY];draw();};canvas.onpointerup=canvas.onpointercancel=()=>dragging=null;
 canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(50,Math.min(380,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});window.addEventListener('resize',draw);
+document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{const view=button.dataset.view;if(view==='side'){yaw=0;pitch=0;}else if(view==='back'){yaw=Math.PI/2;pitch=0;}else{yaw=0;pitch=Math.PI/2;}draw();});
 async function poll(){
  try{
   const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});if(!r.ok)throw Error();const s=await r.json();driveState=s;

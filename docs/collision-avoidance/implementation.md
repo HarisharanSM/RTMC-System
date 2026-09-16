@@ -36,7 +36,7 @@ The worker returns a finite permit with session, request sequence, scene generat
 | `tests/test_collision.cpp` | Geometry, future-path, worker and integrated lifecycle tests |
 | `tests/test_runtime.py` | Real executable, integrated page, CAN command/feedback, watchdog and predictive stop acceptance |
 
-The scene is compiled from the same numerical assumptions as `data/collision/reference/parameters.json`; the checked-in JSON/OBJ files remain inspection assets. Future measured models should be generated into a typed scene artifact or loaded through a validated parser so data and runtime constants cannot drift. Current artifact tests and collision tests independently check their respective representations but do not yet compare every compiled body field to generated scene JSON.
+The scene bodies and joint-interface pair policy are emitted as typed C++ data from `data/collision/reference/parameters.json`, alongside the JSON/OBJ inspection assets. The compiled predictor and browser therefore consume artifacts from one generation step; reproducibility tests cover the complete generated set.
 
 ## Simulation constants
 
@@ -53,7 +53,7 @@ The application callback cadence remains input-driven at 50 ms. A permit lives f
 - The broad phase is pair-level separating-axis rejection for the current small scene. A static BVH/dynamic tree is still needed if measured scene density makes brute-force pair enumeration miss its deadline.
 - Version one accepts one active axis direction. A direction change invokes a stop and requires Stop plus a new Start.
 - The compiled scene is immutable after construction. The common geometry/frame representation supports future mobility changes, but atomic runtime scene generation replacement and tracked-object uncertainty are not implemented.
-- Permanent link1/link2, link2/alignment, alignment/C-arm and legacy link2/C-arm interface pairs are excluded at rigid-body-pair level because the synthetic boxes overlap at their connections. Measured geometry needs reviewed local contact masks.
+- Eight declared synthetic bearing/interface pairs are excluded at rigid-body-pair level because their boxes overlap at connections. They are generated with the scene data. Measured geometry still needs reviewed local contact masks.
 - Housing, table, patient fixture and A3/A4/A5 frame values remain synthetic and `simulation_only`.
 
 ## Verification
@@ -110,3 +110,23 @@ deadline failure and collision retain fail-closed stop/latch behavior.
 The HTTP listener now closes its listening descriptor before joining its worker,
 so SIGTERM reliably performs supervised shutdown on macOS. This change does not
 alter command protocol or motion authority.
+
+## Revision 5: drawing-based connected assembly
+
+The physical collision frames now separate link 2, the column, compensated A3
+boom, A4 carrier, A5 carrier and C-arm. A fixed K-to-world registration moves the
+physical base and column headward while preserving the existing 75/100 cm drive
+solve and keeping the imaging centre at patient-head X/Y zero. The neutral C is
+authored in XZ and opens toward the table. A declared synthetic remote-centre
+carrier keeps A4/A5 rotation about the imaging centre; its dimensions are
+provisional because the source drawings are not dimensioned.
+
+`parameters.json` now generates the browser scene, OBJ poses and the typed C++
+scene/pair-policy include. The integrated index uses the same eight-frame chain,
+offers side/back/top views and continues to move only from coherent drive CAN
+feedback. Collision-stop telemetry includes the limiting 3D body pair.
+
+The revision-5 host verification passed 25/25 kinematic scenarios (58 checks),
+42 collision checks, 12 artifact tests with 18 reproducible generated files, and
+24 real-executable runtime checks. CMake was unavailable on the host, so the
+C++17 targets were compiled directly from the source lists in `CMakeLists.txt`.

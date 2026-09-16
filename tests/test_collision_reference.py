@@ -36,7 +36,7 @@ class ReferenceDataTests(unittest.TestCase):
             self.assertTrue(all(math.isfinite(x) and x > 0 for x in b["size_m"]))
             self.assertTrue(all(math.isfinite(x) for x in b["center_m"]))
             self.assertTrue(b["collision_enabled"])
-        self.assertEqual(self.scene["pair_policy"]["adjacent_body_exclusions"], [])
+        self.assertEqual(len(self.scene["pair_policy"]["adjacent_body_exclusions"]), 8)
 
     def test_planar_home_and_extension(self):
         for q, expected in [([-180, 180, 0, 0, 0], [0, 0, 1.2]), ([0, 0, 0, 0, 0], [1.5, 0, 1.2])]:
@@ -49,7 +49,7 @@ class ReferenceDataTests(unittest.TestCase):
             f = ref.frames(self.p, [a1, a2, -a1-a2, 0, 0])
             end = ref.transform(f["link2"], [1, 0, 0])
             eof = ref.transform(f["carm"], [0, 0, 0])
-            self.assertAlmostEqual(end[0], eof[0], places=12)
+            self.assertAlmostEqual(end[0] + self.p["kinematics"]["column_to_isocenter_x_m"], eof[0], places=12)
             self.assertAlmostEqual(end[1], eof[1], places=12)
         q = [-90, 90, 0, 0, 0]
         eof = ref.transform(ref.frames(self.p, q)["carm"], [0, 0, 0])
@@ -85,7 +85,7 @@ class ReferenceDataTests(unittest.TestCase):
     def test_head_side_support_and_a5_limits(self):
         home = ref.frames(self.p, self.p['kinematics']['home_deg'])
         column = next(b for b in self.scene['bodies'] if b['id'] == 'support_column')
-        center = ref.transform(home['eof_support'], column['center_m'])
+        center = ref.transform(home['column'], column['center_m'])
         self.assertLess(center[0], -.70)
         self.assertAlmostEqual(center[1], 0.0, places=12)
         self.assertEqual(self.p['kinematics']['joint_limits_deg'][4], [-90, 90])
@@ -103,13 +103,13 @@ class ReferenceDataTests(unittest.TestCase):
         self.assertEqual(len(arc), r["carm_segments"])
         h = math.radians(r["carm_arc_end_deg"]-r["carm_arc_start_deg"]) / (2*len(arc))
         for b in arc:
-            theta = b["rotation_x_rad"]
+            theta = -b["rotation_y_rad"]
             for fraction, radius, depth in itertools.product([i/50 for i in range(51)],
                     [r["carm_inner_radius_m"], r["carm_outer_radius_m"]], [-1, 1]):
                 angle = theta-h+2*h*fraction
-                p = [depth*r["carm_depth_x_m"]/2, radius*math.cos(angle), radius*math.sin(angle)]
+                p = [radius*math.cos(angle), depth*r["carm_depth_y_m"]/2, radius*math.sin(angle)]
                 centered = [v-c for v,c in zip(p, b["center_m"])]
-                local = ref.transform(ref.rotation("x", -theta), centered)
+                local = ref.transform(ref.rotation("y", theta), centered)
                 self.assertTrue(all(abs(v) <= size/2+1e-12 for v,size in zip(local,b["size_m"])))
 
     def test_generated_outputs_and_manifest(self):

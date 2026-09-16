@@ -10,6 +10,7 @@
 #include <atomic>
 #include <mutex>
 #include <thread>
+#include <string>
 
 class cDriveController {
 public:
@@ -44,6 +45,7 @@ private:
     bool ApplyMotion(const joystickSignal& signal);
     bool SubmitCollisionRequest();
     void ProtectiveStop(const char* reason);
+    std::string CollisionStopReason() const;
     void SafetyMonitorLoop();
     void MonitorStop();
     static bool IsSingleDirection(const joystickSignal& signal);

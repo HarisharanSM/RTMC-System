@@ -18,4 +18,6 @@ public:
     virtual bool IsStopRequested(std::uint64_t session) const = 0;
     virtual std::uint64_t SceneGeneration() const = 0;
     virtual const char* StopReason() const { return "Collision worker revoked motion"; }
+    virtual const char* StopMovingBody() const { return ""; }
+    virtual const char* StopObstacle() const { return ""; }
 };

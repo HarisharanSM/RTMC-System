@@ -30,12 +30,6 @@ double StoppingTravel(double speed, bool velocityMeasured, double maximumSpeed,
     return reactionTravel + speedAtBrake * speedAtBrake / (2.0 * braking);
 }
 
-bool SamePair(const CollisionBody& lhs, const CollisionBody& rhs,
-              const char* first, const char* second) {
-    return (lhs.rigidBody == first && rhs.rigidBody == second) ||
-           (lhs.rigidBody == second && rhs.rigidBody == first);
-}
-
 } // namespace
 
 cTrajectoryPredictor::cTrajectoryPredictor(cSceneRegistry scene, PredictionSettings settings)
@@ -135,14 +129,11 @@ bool cTrajectoryPredictor::ShouldCheckPair(const CollisionBody& lhs,
                                            const CollisionBody& rhs) const {
     if (&lhs == &rhs || lhs.rigidBody == rhs.rigidBody) return false;
     if (lhs.frame == eBodyFrame::World && rhs.frame == eBodyFrame::World) return false;
-    if (lhs.obstacle || rhs.obstacle) return true;
 
-    // These are the two permanent articulated joints represented by overlapping
-    // housing boxes. Other robot pairs remain active for self-collision.
-    if (SamePair(lhs, rhs, "link1", "link2")) return false;
-    if (SamePair(lhs, rhs, "link2", "carm")) return false;
-    if (SamePair(lhs, rhs, "link2", "alignment")) return false;
-    if (SamePair(lhs, rhs, "alignment", "carm")) return false;
+    // Synthetic joint-interface boxes intentionally overlap at their bearings.
+    // The exclusions are generated from the same source as the body geometry.
+    if (m_Scene.IsPairExcluded(lhs, rhs)) return false;
+    if (lhs.obstacle || rhs.obstacle) return true;
     return true;
 }
 

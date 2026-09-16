@@ -79,12 +79,29 @@ void cDriveController::MonitorStop() {
         if (m_LifecycleState.compare_exchange_weak(state, eLifecycleState::AvoidanceLatched,
                                                    std::memory_order_acq_rel)) {
             if (m_pCANController) m_pCANController->SetSpeed(0.0f);
-            if (m_pCANController) m_pCANController->PublishAvoidanceStatus("AvoidanceLatched",
-                m_CollisionSupervisor->IsStopRequested(m_Session.load()) ?
-                m_CollisionSupervisor->StopReason() : "Collision permission renewal deadline expired");
+            if (m_pCANController) {
+                const std::string reason = m_CollisionSupervisor->IsStopRequested(m_Session.load()) ?
+                    CollisionStopReason() : "Collision permission renewal deadline expired";
+                m_pCANController->PublishAvoidanceStatus("AvoidanceLatched", reason.c_str());
+            }
             return;
         }
     }
+}
+
+std::string cDriveController::CollisionStopReason() const {
+    if (!m_CollisionSupervisor) return "Collision worker revoked motion";
+    std::string reason = m_CollisionSupervisor->StopReason();
+    const char* moving = m_CollisionSupervisor->StopMovingBody();
+    const char* obstacle = m_CollisionSupervisor->StopObstacle();
+    if (moving && obstacle && moving[0] != '\0' && obstacle[0] != '\0') {
+        reason += " (";
+        reason += moving;
+        reason += " / ";
+        reason += obstacle;
+        reason += ")";
+    }
+    return reason;
 }
 
 bool cDriveController::IsSingleDirection(const joystickSignal& signal) {
@@ -155,7 +172,8 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
         }
         const std::uint64_t session = m_Session.load(std::memory_order_acquire);
         if (m_CollisionSupervisor->IsStopRequested(session)) {
-            ProtectiveStop("collision worker revoked motion");
+            const std::string reason = CollisionStopReason();
+            ProtectiveStop(reason.c_str());
             return;
         }
 

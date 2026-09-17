@@ -69,7 +69,8 @@ void cCANMocker::Stop() {
 void cCANMocker::MockingLoop() {
     const std::map<std::string,int> buttons{
         {"R-up",0},{"R-down",1},{"R-left",2},{"R-right",3},
-        {"L-up",4},{"L-down",5},{"L-left",6},{"L-right",7}};
+        {"L-up",4},{"L-down",5},{"L-left",6},{"L-right",7},
+        {"A3-left",8},{"A3-right",9}};
     auto controller=std::dynamic_pointer_cast<cPCANController>(m_PcanController);
     while(m_IsRunning) {
         const int client=accept(m_ServerFd,nullptr,nullptr);

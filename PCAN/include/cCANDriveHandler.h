@@ -8,7 +8,7 @@ public:
     ~cCANDriveHandler() = default;
 
     /**
-     * @brief Translates version-3 or legacy UI CAN direction data into a normalized joystick signal.
+     * @brief Translates version-4 or legacy UI CAN direction data into a normalized joystick signal.
      */
     joystickSignal ConvertToJoystickSignal(const TPCANMsg& msg) const;
 };

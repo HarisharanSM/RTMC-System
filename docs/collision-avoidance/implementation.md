@@ -4,7 +4,7 @@ Revision 4, 2026-09-15. This document records what the repository implements fro
 
 The integrated `index.html` canvas and drive-originated CAN feedback workflow
 are implemented according to [architecture revision 3, section 18](architecture.md#18-integrated-joystick-c-arm-display-and-can-workflow).
-The runtime has no iframe. UI press/hold/Stop requests use revision-3 CAN fields;
+The runtime has no iframe. UI press/hold/Stop requests use revision-4 CAN fields;
 drive commits are encoded as five fixed-point angle frames, speed and a commit
 marker. Only a complete matching sequence updates the pose returned by `/state`.
 An unchanged-pose CAN heartbeat keeps feedback age meaningful while stationary.
@@ -30,7 +30,7 @@ The worker returns a finite permit with session, request sequence, scene generat
 | `collision/src/cTrajectoryPredictor.cpp` | Braking travel, kinematic clipping and conservative interval certification |
 | `collision/src/cCollisionSupervisor.cpp` | Worker lifecycle, mailboxes, session filtering and sticky stop request |
 | `drive/src/cDriveController.cpp` | Preflight/running/latch states, 1 ms stop monitor and final permit gate |
-| `PCAN/src/cPCANController.cpp` | Revision-3 input decoding, fixed-point drive feedback, coherent assembly and heartbeat |
+| `PCAN/src/cPCANController.cpp` | Revision-4 input decoding, fixed-point drive feedback, coherent assembly and heartbeat |
 | `CANMocker/src/cCANMocker.cpp` | Versioned press/hold/Stop CAN frames, integrated page/model routes and state API |
 | `ui/index.html` | Integrated model canvas, joystick lifecycle, five-axis CAN feedback and stale-state handling |
 | `tests/test_collision.cpp` | Geometry, future-path, worker and integrated lifecycle tests |
@@ -130,3 +130,32 @@ The revision-5 host verification passed 25/25 kinematic scenarios (58 checks),
 42 collision checks, 12 artifact tests with 18 reproducible generated files, and
 24 real-executable runtime checks. CMake was unavailable on the host, so the
 C++17 targets were compiled directly from the source lists in `CMakeLists.txt`.
+
+## Revision 6: independent A3 controls and retained heading
+
+The integrated page now exposes A3 left/right hold controls through protocol
+revision 4 direction values 9 and 10. The existing Start/Hold/Stop session,
+finite permit and sticky latch behavior applies unchanged. Accepted A3 motion is
+returned through the existing coherent five-angle CAN sample; the canvas derives
+heading and the moving imaging centre from that sample and marks the fixed A3
+pivot. Stale feedback no longer replaces the last coherent displayed pose.
+
+The drive keeps accepted axles as canonical state. Pure A3 motion holds
+A1/A2/A4/A5 and follows the carrier arc with a 10 deg/s, 20 deg/s2 profile.
+Exact-home A3 motion is denied by the existing X>=0 imaging envelope. After an
+A3 jog, patient X/Y inverse kinematics solves the shifted column-pivot target and
+sets A3 so `A1+A2+A3` retains the selected heading.
+
+The predictor evaluates pure A3 directly in joint space and uses a separate
+5 degree worst-case stop horizon. It refuses a permit if the complete A3 stop
+would exceed the workspace or A3 travel rather than clipping that stop to a
+reachable fraction. Non-A3 prediction preserves nonzero heading and its A3
+value while evaluating actual revision-5 body frames.
+
+Fresh simulation evidence passed 28/28 kinematic scenarios (65 checks), the
+collision suite, and the real `pcan_demo` A3 workflow. The runtime moved into
+the interior workspace, held A1/A2 during A3 rotation, retained heading during
+X translation, restored neutral heading with the opposite A3 command, and then
+latched on the normal predicted 3D collision. The observed current-pose gap was
+0.0836 m for `carm_sector_05 / table_top`. This remains synthetic commanded
+feedback and is not physical collision-protection evidence.

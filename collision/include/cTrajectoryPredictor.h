@@ -24,6 +24,8 @@ private:
     drivePosition PoseAt(const CollisionRequest& request, double linearTravelM,
                          double angularTravelRad, double fraction) const;
     bool SolvePose(const drivePosition& position, AxelPostion& axles) const;
+    bool AxlesAt(const CollisionRequest& request, double linearTravelM,
+                 double angularTravelRad, double fraction, AxelPostion& axles) const;
     double FeasibleFraction(const CollisionRequest& request, double linearTravelM,
                             double angularTravelRad) const;
     eIntervalResult CheckInterval(const CollisionRequest& request, double linearTravelM,

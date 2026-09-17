@@ -193,8 +193,8 @@ def run(binary):
             else:
                 raise RuntimeError("Simulator did not start")
             check(initial["state"]=="Disarmed" and initial["collision_enabled"] and
-                  len(initial["axles_deg"])==5 and initial["protocol_version"]==3,
-                  "startup has collision supervision and revision-3 five-axis telemetry")
+                  len(initial["axles_deg"])==5 and initial["protocol_version"]==4,
+                  "startup has collision supervision and revision-4 five-axis telemetry")
             check(initial["feedback_valid"] and initial["pose_source"]=="drive_can_feedback" and
                   initial["pose_sequence"]==initial["sequence"] and initial["can_feedback_frames"]>=7,
                   "home pose is assembled from a complete drive-originated CAN sample")
@@ -202,7 +202,8 @@ def run(binary):
                 dashboard=reply.read()
                 check(b'<canvas id="carm-view"' in dashboard and b'<iframe' not in dashboard and
                       b"drive_can_feedback" in dashboard and b'data-view="side"' in dashboard and
-                      b'data-view="back"' in dashboard and b'data-view="top"' in dashboard,
+                      b'data-view="back"' in dashboard and b'data-view="top"' in dashboard and
+                      b'data-btn="A3-left"' in dashboard and b'data-btn="A3-right"' in dashboard,
                       "index contains the CAN-driven C-arm canvas without an iframe")
                 check(b"10 mm residual gap" in dashboard and b"CRAN/CAUD" in dashboard,
                       "index displays the revised clearance and angular-limit policy")
@@ -228,7 +229,7 @@ def run(binary):
             initial_sequence=initial["sequence"]
             # A lost browser/joystick stream must stop without any more drive calls.
             first_start=command("R-up","start")
-            check(first_start["protocol_version"]==3 and first_start["session"]>0 and
+            check(first_start["protocol_version"]==4 and first_start["session"]>0 and
                   first_start["input_sequence"]>0,
                   "UI press is encoded with revision, sequence and session")
             last_input_sequence=first_start["input_sequence"]
@@ -247,14 +248,51 @@ def run(binary):
                   "independent watchdog stops on missing renewal")
             command("none","stop")
             check(state()["state"]=="Disarmed", "controller Stop acknowledges watchdog latch")
-            second_start=command("R-up","start")
-            check(second_start["session"]!=first_start["session"],
+            translation_start=command("R-up","start")
+            check(translation_start["session"]!=first_start["session"],
                   "Stop retires the input session and fresh press allocates another")
-            for _ in range(400):
+            for _ in range(100):
                 time.sleep(.05); command("R-up")
                 current=state()
-                q=current["axles_deg"]
-                assert abs(q[0]+q[1]+q[2])<=3e-4, "A3 alignment exceeds CAN quantization bound"
+                if x_m(current)>=.08 or current["state"]=="AvoidanceLatched":
+                    break
+            check(current["state"]!="AvoidanceLatched" and x_m(current)>=.08,
+                  "translation creates interior workspace for A3 rotation")
+            command("none","stop")
+            before_a3=state()["axles_deg"]
+            a3_start=command("A3-right","start")
+            for _ in range(12):
+                time.sleep(.05);command("A3-right")
+            after_a3_state=state();after_a3=after_a3_state["axles_deg"]
+            check(after_a3_state["state"]=="Running" and after_a3_state["speed_dps"]==10 and
+                  after_a3[2]>before_a3[2]+.5 and
+                  abs(after_a3[0]-before_a3[0])<=1e-4 and abs(after_a3[1]-before_a3[1])<=1e-4,
+                  "A3 UI hold rotates A3 while drive feedback holds A1 and A2")
+            retained_heading=sum(after_a3[:3])
+            command("none","stop")
+            second_start=command("R-up","start")
+            check(second_start["session"]!=a3_start["session"],
+                  "A3 release retires its session before retained-heading translation")
+            retained_sequence=state()["sequence"]
+            for _ in range(10):
+                time.sleep(.05); command("R-up")
+                current=state();q=current["axles_deg"]
+                assert abs(sum(q[:3])-retained_heading)<=4e-4, "retained A3 heading exceeds CAN quantization bound"
+            check(current["sequence"]>retained_sequence and current["state"]=="Running",
+                  "X translation advances while preserving the A3-selected heading")
+            command("none","stop")
+            restore_start=command("A3-left","start")
+            for _ in range(12):
+                time.sleep(.05);command("A3-left")
+            restored=state();restored_heading=sum(restored["axles_deg"][:3])
+            check(restored["state"]=="Running" and abs(restored_heading)<=4e-4,
+                  "opposite A3 UI hold restores the neutral carrier heading")
+            command("none","stop")
+            collision_start=command("R-up","start")
+            for _ in range(400):
+                time.sleep(.05); command("R-up")
+                current=state();q=current["axles_deg"]
+                assert abs(sum(q[:3])-restored_heading)<=4e-4, "neutral heading exceeds CAN quantization bound"
                 if current["state"]=="AvoidanceLatched":
                     break
             else:
@@ -281,7 +319,7 @@ def run(binary):
             command("none","stop")
             check(state()["state"]=="Disarmed", "controller Stop acknowledges collision latch")
             reverse_start=command("R-down","start")
-            check(reverse_start["session"]!=second_start["session"],
+            check(reverse_start["session"]!=collision_start["session"],
                   "reverse begins in a fresh controller input session")
             for _ in range(10):
                 time.sleep(.05); command("R-down")

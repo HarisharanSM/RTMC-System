@@ -19,7 +19,7 @@ cDriveController::cDriveController(
         std::unique_ptr<iCollisionSupervisor> collisionSupervisor)
     : m_IsEmergencyStopped(false),
       m_CurrentErrorCode(0),
-      m_CurrentPosition{0, 0, 0, 0},
+      m_CurrentPosition{0, 0, 0, 0, 0},
       m_CurrentAxelPosition{0, 0, 0, 0},
       m_LastStatus(eKinematicStatus::Ok),
       m_pCANController(std::move(pCANptr)),
@@ -105,7 +105,7 @@ std::string cDriveController::CollisionStopReason() const {
 }
 
 bool cDriveController::IsSingleDirection(const joystickSignal& signal) {
-    const double values[] = {signal.x, signal.y, signal.LAO, signal.CRAN};
+    const double values[] = {signal.x, signal.y, signal.LAO, signal.CRAN, signal.A3};
     int active = 0;
     for (double value : values) {
         if (!std::isfinite(value) || (value != -1.0 && value != 0.0 && value != 1.0)) return false;
@@ -115,7 +115,8 @@ bool cDriveController::IsSingleDirection(const joystickSignal& signal) {
 }
 
 bool cDriveController::SameDirection(const joystickSignal& lhs, const joystickSignal& rhs) {
-    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.LAO == rhs.LAO && lhs.CRAN == rhs.CRAN;
+    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.LAO == rhs.LAO &&
+           lhs.CRAN == rhs.CRAN && lhs.A3 == rhs.A3;
 }
 
 bool cDriveController::SubmitCollisionRequest() {
@@ -198,7 +199,9 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
             std::lock_guard<std::mutex> lock(m_CommandMutex);
             if (m_LifecycleState.load(std::memory_order_acquire) != eLifecycleState::Preflight ||
                 m_CollisionSupervisor->IsStopRequested(session)) return;
-            m_pCANController->SetSpeed(static_cast<float>(MAX_JOINT_SPEED_DPS));
+            const double commandedSpeed = signal.A3 == 0.0 ? MAX_JOINT_SPEED_DPS :
+                                                             MAX_A3_SPEED_DPS;
+            m_pCANController->SetSpeed(static_cast<float>(commandedSpeed));
         }
         if (!ApplyMotion(signal)) return;
         m_NextMotionAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
@@ -221,7 +224,7 @@ bool cDriveController::ApplyMotion(const joystickSignal& signal) {
 
     drivePosition nextPosition{};
     AxelPostion nextAxelPosition{};
-    m_LastStatus = m_ptrCalculator->CalculateNextPosition(m_CurrentPosition, signal,
+    m_LastStatus = m_ptrCalculator->CalculateNextPosition(m_CurrentPosition, m_CurrentAxelPosition, signal,
                                                           nextPosition, nextAxelPosition);
 
     // The calculator only ever hands back a pose that satisfies the envelope,
@@ -317,7 +320,9 @@ void cDriveController::StartDrive(const joystickSignal& signal) {
         m_ptrCalculator->ResetMotionProfile();
     }
     if (m_pCANController) {
-        m_pCANController->SetSpeed(static_cast<float>(MAX_JOINT_SPEED_DPS));
+        const double commandedSpeed = signal.A3 == 0.0 ? MAX_JOINT_SPEED_DPS :
+                                                         MAX_A3_SPEED_DPS;
+        m_pCANController->SetSpeed(static_cast<float>(commandedSpeed));
     }
     HandleJoystick(signal);
 }

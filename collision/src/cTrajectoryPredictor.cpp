@@ -38,9 +38,10 @@ cTrajectoryPredictor::cTrajectoryPredictor(cSceneRegistry scene, PredictionSetti
 bool cTrajectoryPredictor::IsFinite(const CollisionRequest& request) const {
     const double values[] = {
         request.currentPosition.X, request.currentPosition.Y, request.currentPosition.LAO,
-        request.currentPosition.CRAN, request.currentAxles.A1, request.currentAxles.A2,
+        request.currentPosition.CRAN, request.currentPosition.Yaw,
+        request.currentAxles.A1, request.currentAxles.A2,
         request.currentAxles.A3, request.currentAxles.A4, request.currentAxles.A5, request.direction.x,
-        request.direction.y, request.direction.LAO, request.direction.CRAN,
+        request.direction.y, request.direction.LAO, request.direction.CRAN, request.direction.A3,
         request.linearSpeedMps, request.angularSpeedRadps
     };
     for (double value : values) if (!std::isfinite(value)) return false;
@@ -56,6 +57,9 @@ bool cTrajectoryPredictor::AreSettingsValid() const {
         m_Settings.maximumAngularSpeedRadps,
         m_Settings.maximumAngularAccelerationRadps2,
         m_Settings.guaranteedAngularDecelerationRadps2,
+        m_Settings.maximumA3SpeedRadps,
+        m_Settings.maximumA3AccelerationRadps2,
+        m_Settings.guaranteedA3DecelerationRadps2,
         m_Settings.pairMarginM,
         m_Settings.permitLifetimeS,
         m_Settings.intervalMotionToleranceM
@@ -68,6 +72,9 @@ bool cTrajectoryPredictor::AreSettingsValid() const {
         m_Settings.maximumAngularSpeedRadps >= 0.0 &&
         m_Settings.maximumAngularAccelerationRadps2 >= 0.0 &&
         m_Settings.guaranteedAngularDecelerationRadps2 > 0.0 &&
+        m_Settings.maximumA3SpeedRadps >= 0.0 &&
+        m_Settings.maximumA3AccelerationRadps2 >= 0.0 &&
+        m_Settings.guaranteedA3DecelerationRadps2 > 0.0 &&
         m_Settings.pairMarginM >= 0.0 &&
         m_Settings.permitLifetimeS > 0.0 &&
         m_Settings.intervalMotionToleranceM >= 0.0 &&
@@ -75,7 +82,7 @@ bool cTrajectoryPredictor::AreSettingsValid() const {
 }
 
 bool cTrajectoryPredictor::IsDirectionValid(const joystickSignal& direction) const {
-    const double values[] = {direction.x, direction.y, direction.LAO, direction.CRAN};
+    const double values[] = {direction.x, direction.y, direction.LAO, direction.CRAN, direction.A3};
     int active = 0;
     for (double value : values) {
         if (value != -1.0 && value != 0.0 && value != 1.0) return false;
@@ -93,7 +100,8 @@ drivePosition cTrajectoryPredictor::PoseAt(const CollisionRequest& request,
         request.currentPosition.X + request.direction.x * linearTravelCm * fraction,
         request.currentPosition.Y + request.direction.y * linearTravelCm * fraction,
         request.currentPosition.LAO + request.direction.LAO * angularTravelDeg * fraction,
-        request.currentPosition.CRAN + request.direction.CRAN * angularTravelDeg * fraction
+        request.currentPosition.CRAN + request.direction.CRAN * angularTravelDeg * fraction,
+        request.currentPosition.Yaw
     };
 }
 
@@ -106,17 +114,60 @@ bool cTrajectoryPredictor::SolvePose(const drivePosition& position, AxelPostion&
     return calculator.CalculateInverseKinematics(position, axles) == eKinematicStatus::Ok;
 }
 
+bool cTrajectoryPredictor::AxlesAt(const CollisionRequest& request,
+                                   double linearTravelM, double angularTravelRad,
+                                   double fraction, AxelPostion& axles) const {
+    if (request.direction.A3 == 0.0)
+        return SolvePose(PoseAt(request, linearTravelM, angularTravelRad, fraction), axles);
+
+    axles = request.currentAxles;
+    axles.A3 += request.direction.A3 * angularTravelRad * 180.0 / PI * fraction;
+    if (axles.A3 < RTMCGeometry::A3_MIN_DEG || axles.A3 > RTMCGeometry::A3_MAX_DEG)
+        return false;
+    cDriveCalculator calculator;
+    const drivePosition position = calculator.CalculateForwardKinematics(axles);
+    return position.X >= RTMCGeometry::ENVELOPE_MIN_X_CM &&
+           position.X <= RTMCGeometry::ENVELOPE_MAX_X_CM &&
+           position.Y >= RTMCGeometry::ENVELOPE_MIN_Y_CM &&
+           position.Y <= RTMCGeometry::ENVELOPE_MAX_Y_CM;
+}
+
 double cTrajectoryPredictor::FeasibleFraction(const CollisionRequest& request,
                                                double linearTravelM,
                                                double angularTravelRad) const {
+    if (request.direction.A3 != 0.0) {
+        AxelPostion endpoint{};
+        if (!AxlesAt(request, linearTravelM, angularTravelRad, 1.0, endpoint))
+            return -1.0;
+        const double startHeading = (request.currentAxles.A1 + request.currentAxles.A2 +
+                                     request.currentAxles.A3) * PI / 180.0;
+        const double headingDelta = request.direction.A3 * angularTravelRad;
+        if (std::abs(headingDelta) <= 1e-15) return 1.0;
+        const double lower = std::min(startHeading, startHeading + headingDelta);
+        const double upper = std::max(startHeading, startHeading + headingDelta);
+        const int first = static_cast<int>(std::ceil(lower / (PI / 2.0)));
+        const int last = static_cast<int>(std::floor(upper / (PI / 2.0)));
+        for (int k = first; k <= last; ++k) {
+            const double crossing = k * PI / 2.0;
+            const double fraction = (crossing - startHeading) / headingDelta;
+            AxelPostion crossingAxles{};
+            if (fraction > 0.0 && fraction < 1.0 &&
+                !AxlesAt(request, linearTravelM, angularTravelRad, fraction,
+                          crossingAxles)) return -1.0;
+        }
+        return 1.0;
+    }
     AxelPostion endpoint{};
-    if (SolvePose(PoseAt(request, linearTravelM, angularTravelRad, 1.0), endpoint)) return 1.0;
+    if (AxlesAt(request, linearTravelM, angularTravelRad, 1.0, endpoint)) return 1.0;
+    // A3 must be able to execute its complete bounded stop. Clipping the check
+    // at a joint/workspace boundary would issue a permit without proving that
+    // the rotating carrier can actually stop before that boundary.
     double valid = 0.0;
     double invalid = 1.0;
     for (int i = 0; i < 48; ++i) {
         const double middle = (valid + invalid) / 2.0;
         AxelPostion candidate{};
-        if (SolvePose(PoseAt(request, linearTravelM, angularTravelRad, middle), candidate)) {
+        if (AxlesAt(request, linearTravelM, angularTravelRad, middle, candidate)) {
             valid = middle;
         } else {
             invalid = middle;
@@ -194,9 +245,9 @@ cTrajectoryPredictor::eIntervalResult cTrajectoryPredictor::CheckPairInterval(
         double begin, double end, int depth, CollisionPermit& result) const {
     const double middleFraction = (begin + end) / 2.0;
     AxelPostion beginAxles{}, middleAxles{}, endAxles{};
-    if (!SolvePose(PoseAt(request, linearTravelM, angularTravelRad, begin), beginAxles) ||
-        !SolvePose(PoseAt(request, linearTravelM, angularTravelRad, middleFraction), middleAxles) ||
-        !SolvePose(PoseAt(request, linearTravelM, angularTravelRad, end), endAxles)) {
+    if (!AxlesAt(request, linearTravelM, angularTravelRad, begin, beginAxles) ||
+        !AxlesAt(request, linearTravelM, angularTravelRad, middleFraction, middleAxles) ||
+        !AxlesAt(request, linearTravelM, angularTravelRad, end, endAxles)) {
         result.reason = "predicted pose is outside the kinematic safety envelope";
         return eIntervalResult::Unknown;
     }
@@ -205,28 +256,31 @@ cTrajectoryPredictor::eIntervalResult cTrajectoryPredictor::CheckPairInterval(
     // q1=atan2(y,x)-alpha(r), q2=acos(c(r)). For L2>L1 alpha and q2
     // decrease with radius. Radius extrema include the segment's projection
     // onto the base, while atan2 is monotone on this single-axis path (x>0).
-    const auto p0=PoseAt(request,linearTravelM,angularTravelRad,begin);
-    const auto p1=PoseAt(request,linearTravelM,angularTravelRad,end);
-    const double x0=p0.X-RTMCGeometry::BASE_X_CM, y0=p0.Y-RTMCGeometry::BASE_Y_CM;
-    const double x1=p1.X-RTMCGeometry::BASE_X_CM, y1=p1.Y-RTMCGeometry::BASE_Y_CM;
-    const double dx=x1-x0, dy=y1-y0, length2=dx*dx+dy*dy;
-    const double projection=length2>0 ? std::clamp(-(x0*dx+y0*dy)/length2,0.0,1.0) : 0.0;
-    const double rMin=std::hypot(x0+projection*dx,y0+projection*dy);
-    const double rMax=std::max(std::hypot(x0,y0),std::hypot(x1,y1));
-    const double l1=RTMCGeometry::LINK1_LEN_CM, l2=RTMCGeometry::LINK2_LEN_CM;
-    const auto alpha=[&](double r) {return std::acos(std::clamp((l1*l1+r*r-l2*l2)/(2*l1*r),-1.0,1.0))*180/PI;};
-    const auto elbow=[&](double r) {return std::acos(std::clamp((r*r-l1*l1-l2*l2)/(2*l1*l2),-1.0,1.0))*180/PI;};
-    const double theta0=std::atan2(y0,x0)*180/PI, theta1=std::atan2(y1,x1)*180/PI;
-    const double q1Min=std::min(theta0,theta1)-alpha(rMin);
-    const double q1Max=std::max(theta0,theta1)-alpha(rMax);
-    const double dq1=std::max(std::abs(q1Min-middleAxles.A1),std::abs(q1Max-middleAxles.A1));
-    const double dq2=std::max(std::abs(elbow(rMin)-middleAxles.A2),std::abs(elbow(rMax)-middleAxles.A2));
-    // Synthetic extremal angles are only fed to the displacement bound;
-    // geometry is evaluated at the real midpoint. A3 cancellation is exact.
-    beginAxles.A1=middleAxles.A1-dq1; endAxles.A1=middleAxles.A1+dq1;
-    beginAxles.A2=middleAxles.A2-dq2; endAxles.A2=middleAxles.A2+dq2;
-    beginAxles.A3=-(beginAxles.A1+beginAxles.A2);
-    endAxles.A3=-(endAxles.A1+endAxles.A2);
+    if (request.direction.x != 0.0 || request.direction.y != 0.0) {
+        const auto p0=PoseAt(request,linearTravelM,angularTravelRad,begin);
+        const auto p1=PoseAt(request,linearTravelM,angularTravelRad,end);
+        const double yaw=p0.Yaw*PI/180.0;
+        const double offsetX=RTMCGeometry::COLUMN_TO_ISOCENTER_CM*(1.0-std::cos(yaw));
+        const double offsetY=-RTMCGeometry::COLUMN_TO_ISOCENTER_CM*std::sin(yaw);
+        const double x0=p0.X+offsetX-RTMCGeometry::BASE_X_CM, y0=p0.Y+offsetY-RTMCGeometry::BASE_Y_CM;
+        const double x1=p1.X+offsetX-RTMCGeometry::BASE_X_CM, y1=p1.Y+offsetY-RTMCGeometry::BASE_Y_CM;
+        const double dx=x1-x0, dy=y1-y0, length2=dx*dx+dy*dy;
+        const double projection=length2>0 ? std::clamp(-(x0*dx+y0*dy)/length2,0.0,1.0) : 0.0;
+        const double rMin=std::hypot(x0+projection*dx,y0+projection*dy);
+        const double rMax=std::max(std::hypot(x0,y0),std::hypot(x1,y1));
+        const double l1=RTMCGeometry::LINK1_LEN_CM, l2=RTMCGeometry::LINK2_LEN_CM;
+        const auto alpha=[&](double r) {return std::acos(std::clamp((l1*l1+r*r-l2*l2)/(2*l1*r),-1.0,1.0))*180/PI;};
+        const auto elbow=[&](double r) {return std::acos(std::clamp((r*r-l1*l1-l2*l2)/(2*l1*l2),-1.0,1.0))*180/PI;};
+        const double theta0=std::atan2(y0,x0)*180/PI, theta1=std::atan2(y1,x1)*180/PI;
+        const double q1Min=std::min(theta0,theta1)-alpha(rMin);
+        const double q1Max=std::max(theta0,theta1)-alpha(rMax);
+        const double dq1=std::max(std::abs(q1Min-middleAxles.A1),std::abs(q1Max-middleAxles.A1));
+        const double dq2=std::max(std::abs(elbow(rMin)-middleAxles.A2),std::abs(elbow(rMax)-middleAxles.A2));
+        beginAxles.A1=middleAxles.A1-dq1; endAxles.A1=middleAxles.A1+dq1;
+        beginAxles.A2=middleAxles.A2-dq2; endAxles.A2=middleAxles.A2+dq2;
+        beginAxles.A3=p0.Yaw-(beginAxles.A1+beginAxles.A2);
+        endAxles.A3=p0.Yaw-(endAxles.A1+endAxles.A2);
+    }
     const eIntervalResult pair = CheckPair(moving, other, beginAxles, middleAxles,
                                            endAxles, result);
     if (pair != eIntervalResult::Unknown) return pair;
@@ -273,11 +327,21 @@ CollisionPermit cTrajectoryPredictor::Predict(const CollisionRequest& request) c
     result.predictedTravelM = StoppingTravel(request.linearSpeedMps, request.velocityMeasured,
         m_Settings.maximumLinearSpeedMps, m_Settings.maximumLinearAccelerationMps2,
         m_Settings.reactionTimeS, m_Settings.guaranteedLinearDecelerationMps2);
-    result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, request.velocityMeasured,
-        m_Settings.maximumAngularSpeedRadps, m_Settings.maximumAngularAccelerationRadps2,
-        m_Settings.reactionTimeS, m_Settings.guaranteedAngularDecelerationRadps2);
+    if (request.direction.A3 != 0.0) {
+        result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, request.velocityMeasured,
+            m_Settings.maximumA3SpeedRadps, m_Settings.maximumA3AccelerationRadps2,
+            m_Settings.reactionTimeS, m_Settings.guaranteedA3DecelerationRadps2);
+    } else {
+        result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, request.velocityMeasured,
+            m_Settings.maximumAngularSpeedRadps, m_Settings.maximumAngularAccelerationRadps2,
+            m_Settings.reactionTimeS, m_Settings.guaranteedAngularDecelerationRadps2);
+    }
     const double feasible = FeasibleFraction(request, result.predictedTravelM,
                                              result.predictedTravelRad);
+    if (feasible < 0.0) {
+        result.reason = "A3 stopping path exceeds a joint or workspace limit";
+        return result;
+    }
 
     const eIntervalResult interval = CheckInterval(request, result.predictedTravelM,
                                                    result.predictedTravelRad,

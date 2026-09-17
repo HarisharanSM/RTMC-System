@@ -1,6 +1,6 @@
 # Design and implementation verification
 
-Date: 2026-09-16. Scope: C++ simulation collision module, five-axis drive
+Date: 2026-09-17. Scope: C++ simulation collision module, five-axis drive
 integration, reproducible synthetic geometry, integrated joystick/C-arm runtime and
 fail-closed startup checks. No hardware test or physical safety release is
 claimed.
@@ -29,6 +29,10 @@ claimed.
 | Revision-5 collision suite | 42 checks passed | Generated scene/pair policy, 3D prediction, 10 mm rule, bilateral LAO/RAO, asynchronous permits and stop latch pass |
 | Revision-5 real runtime | 24 checks passed | Actual executable serves the model, uses drive CAN feedback, reports the limiting pair, stops predictively, latches and safely rearms |
 | Observed revision-5 stop | 0.0819 m `carm_sector_05`/`table_top` current-pose gap | The reported limiting pair retained more than the 10 mm residual gap when commanded motion stopped |
+| Revision-6 A3 kinematics | 28/28 scenarios; 65/65 checks passed | Home denial, pure A3 fixed-A1/A2 arc and retained-heading X/Y behavior are executable regressions |
+| Revision-6 collision suite | Passed | Ten-direction revision-4 decoding, independent A3 path, complete-stop home denial and interior clear preflight pass |
+| Revision-6 real runtime | Passed | Actual A3 UI/CAN hold, coherent feedback, retained-heading translation, opposite-jog restore, predictive stop/latch and clean SIGTERM pass |
+| Observed revision-6 stop | 0.0836 m `carm_sector_05`/`table_top` current-pose gap | The normal 3D stop remained active after the A3 workflow and retained more than the 10 mm residual gap |
 
 The live dashboard was fetched from the running application and inspected in the
 browser. It contains the C-arm canvas, patient-head reference, all five axle

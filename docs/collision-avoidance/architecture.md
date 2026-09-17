@@ -1,5 +1,11 @@
 # Predictive collision avoidance for RTMC-System
 
+**Implemented simulation design — revision 6 A3 controls:**
+[A3 left/right controls, motion semantics, UI and collision implementation plan](a3-manual-rotation-design.md)
+specifies independent A3 jogging and retained heading. The protocol, drive,
+predictor, integrated UI and runtime acceptance implement its core simulation
+path; extended geometry-audit and physical-release evidence remain open.
+
 **Implemented simulation design — revision 5, drawings-based:**
 [Assembly, collision architecture and implementation plan](diagram-assembly-design.md)
 defines the column at the link-2 endpoint, upper A3 joint, head-side boom and
@@ -282,7 +288,7 @@ The accompanying [data specification](data-specification.md) defines the deliver
 
 Use meters, radians and seconds internally. Legacy centimeters and degrees convert once at the adapter boundary. World frame W is right-handed with Z up, X along the declared EOF travel, Y across it. W=(0,0,0) is the floor point below the closed-pose EOF, not the base axle. The base's planar offset stays (-0.25,0) m.
 
-Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4 use [-180,180] and A5 uses [-90,90] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are explicit simulation assumptions. Revision 4 uses `Rz(A1+A2+A3) * Rx(A4) * Ry(A5)` for the C-arm, with `A3=-(A1+A2)`, at the EOF X/Y and an assumed isocenter height. The non-tilting rear support additionally uses fixed `Rz(-90°)` to extend toward patient −X. Actual LAO/CRAN axes and offsets remain a release blocker, not inferred facts.
+Preserve A1 in [-180,10] degrees and A2 in [0,180]; A3/A4 use [-180,180] and A5 uses [-90,90] degrees as current assumed software limits. Heights, solid cross-sections, A3/A4 axis placement and housing dimensions are explicit simulation assumptions. The C-arm uses `Rz(A1+A2+A3) * Rx(A4) * Ry(A5)`. Neutral heading has `A3=-(A1+A2)`; an independent A3 jog changes that heading. The non-tilting rear support additionally uses fixed `Rz(-90°)` to extend toward patient −X. Actual LAO/CRAN axes and offsets remain a release blocker, not inferred facts.
 
 ARTIS pheno contributes only the robotic C-arm reference concept, 1.30 m maximum source-to-image distance and 0.955 m usable clearance. Those are reference-product specifications, not complete collision geometry. The detector's published active field is not its external housing size. Our two-link/five-axis robot and fixed table deliberately differ from the manufacturer's mechanism and multi-tilt table. [Siemens ARTIS pheno specifications](https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno), [Siemens system overview](https://academy.siemens-healthineers.com/_/en-us/artis-pheno-system-overview-us/).
 
@@ -614,10 +620,11 @@ not bypass this feedback path.
 | Pose framing | IDs 0x301–0x305 carry signed 0.0001° angles, 0x307 speed and 0x306 atomic commit | Session/epoch rollover and CAN fault injection require target protocol validation |
 
 Revision-2 geometry, patient reference, finite permits, conservative prediction
-and latch requirements remain applicable. The new workflow preserves A1/A2,
-A3=-(A1+A2), A4=LAO and A5=CRAN. At X=Y=0 the imaging pivot coincides with the
-initial head center; translation changes the imaging pivot without re-zeroing
-the patient coordinate frame.
+and latch requirements remain applicable. The workflow uses A4=LAO and A5=CRAN;
+neutral heading uses A3 compensation, while revision 6 permits independent A3
+jog and retains the selected heading during later X/Y. At X=Y=0 with neutral
+heading the imaging pivot coincides with the initial head center; translation
+changes the imaging pivot without re-zeroing the patient coordinate frame.
 
 ### 18.3 Components, ownership and execution
 
@@ -911,9 +918,9 @@ Prior 15-check runtime success does not establish this revision's completion.
 | ID | Test | Required evidence |
 | --- | --- | --- |
 | WF-01 | Open `/` from actual `pcan_demo` | Canvas, joysticks and state in one document; no iframe or separate live navigation |
-| WF-02 | Press each of eight directions | CAN trace retains selected direction; controller routes Start to collision; no premature drive commit |
+| WF-02 | Press each of ten directions | CAN trace retains selected direction, including A3-/+; controller routes Start to collision; no premature drive commit |
 | WF-03 | Clear versus denied preflight | Clear starts only with valid matching permit; denied/unknown remains stationary |
-| WF-04 | Hold and burst traffic | Drive progresses at bounded cadence, renews permits, preserves five-axis rate limits and A3 compensation |
+| WF-04 | Hold and burst traffic | Drive progresses at bounded cadence, renews permits, preserves five-axis rate limits, independent A3 jog and retained heading |
 | WF-05 | Drive-originated display | Trace a committed pose through CAN encode, bus delivery, decode and canvas transform; no alternate state source |
 | WF-06 | Drop/reorder/corrupt one pose fragment | No mixed pose; stale age advances despite successful HTTP requests |
 | WF-07 | Approach pedestal | Predictive stop before contact, measured simulated clearance recorded, no commits after latch |
@@ -932,3 +939,33 @@ browser checks, pose freshness, stop latency and observed clearance in
 `verification.md`. Mark revision 3 implemented only after these software checks
 pass against the same executable and assets. Physical release evidence remains
 governed by G1–G5.
+
+## 19. Revision 6: independent A3 jog
+
+Revision 6 extends the command protocol to ten explicit directions. Values 9
+and 10 request negative and positive A3 motion; the eight-byte version/sequence/
+session layout and the coherent five-angle feedback transaction remain intact.
+The drive owns accepted axles as canonical state. Pure A3 holds A1/A2/A4/A5;
+patient X/Y commands subsequently retain `psi=A1+A2+A3` rather than restoring
+zero heading.
+
+The public Cartesian pose is the offset imaging centre. The two-link endpoint is
+the A3 pivot, and FK adds the 1.15 m carrier vector at heading psi. Heading-aware
+IK subtracts that vector before solving A1/A2, then computes
+`A3=psi-(A1+A2)`. At exact closed home, either A3 direction violates the
+existing X>=0 imaging envelope and is denied without motion.
+
+Collision prediction dispatches A3 to a direct joint trajectory with a
+10 deg/s rate, 20 deg/s2 acceleration/deceleration bounds and a 5 degree
+maximum-speed stopping horizon. A clear permit requires the complete stop to
+remain within A3 travel and the imaging workspace. Other motion paths preserve
+the accepted nonzero heading while evaluating the same revision-5 3D frames.
+Unknown, timeout and geometry hazard retain the existing stop-and-latch response.
+
+The integrated index includes A3 left/right hold buttons, derives all movement
+from coherent drive CAN feedback, and shows physical A3, total heading, the A3
+pivot and imaging centre. Runtime acceptance must demonstrate interior setup,
+fixed A1/A2 during A3, retained-heading translation, Stop/new-session behavior,
+and a later predictive collision latch in the actual `pcan_demo`. Detailed open
+geometry and physical-release gates remain in
+[the A3 design](a3-manual-rotation-design.md).

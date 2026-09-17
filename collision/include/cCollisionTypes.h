@@ -106,6 +106,9 @@ struct PredictionSettings {
     double maximumAngularSpeedRadps = 1.0471975511965976;
     double maximumAngularAccelerationRadps2 = 2.0943951023931953;
     double guaranteedAngularDecelerationRadps2 = 2.0943951023931953;
+    double maximumA3SpeedRadps = 0.17453292519943295; // 10 deg/s
+    double maximumA3AccelerationRadps2 = 0.3490658503988659; // 20 deg/s2
+    double guaranteedA3DecelerationRadps2 = 0.3490658503988659;
     // Residual surface clearance after the complete predicted stop. This is
     // one full-speed 50 ms linear command step (1 cm), not the stopping range.
     double pairMarginM = 0.010;

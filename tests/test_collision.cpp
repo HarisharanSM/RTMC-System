@@ -27,8 +27,8 @@ void Check(bool condition, const std::string& message) {
     if (!condition) ++failures;
 }
 
-joystickSignal Direction(double x, double y, double lao, double cran) {
-    return {x, y, lao, cran};
+joystickSignal Direction(double x, double y, double lao, double cran, double a3 = 0.0) {
+    return {x, y, lao, cran, a3};
 }
 
 CollisionRequest Request(const cSceneRegistry& scene, const joystickSignal& direction,
@@ -107,7 +107,8 @@ void TestStartDirectionProtocol() {
         Direction(1, 0, 0, 0), Direction(-1, 0, 0, 0),
         Direction(0, 1, 0, 0), Direction(0, -1, 0, 0),
         Direction(0, 0, 0, 1), Direction(0, 0, 0, -1),
-        Direction(0, 0, 1, 0), Direction(0, 0, -1, 0)
+        Direction(0, 0, 1, 0), Direction(0, 0, -1, 0),
+        Direction(0, 0, 0, 0, -1), Direction(0, 0, 0, 0, 1)
     };
     bool allDirections = true;
     for (int bit = 0; bit < 8; ++bit) {
@@ -121,7 +122,7 @@ void TestStartDirectionProtocol() {
     }
     Check(allDirections, "all eight CAN bit directions decode to their actual requested axis/sign");
     bool versionedDirections = true;
-    for (int index = 0; index < 8; ++index) {
+    for (int index = 0; index < 10; ++index) {
         TPCANMsg frame{};
         frame.LEN = 8;
         frame.DATA[0] = RTMC_CAN_PROTOCOL_VERSION;
@@ -129,9 +130,9 @@ void TestStartDirectionProtocol() {
         const joystickSignal actual = decoder.ConvertToJoystickSignal(frame);
         versionedDirections = versionedDirections && actual.x == expected[index].x &&
             actual.y == expected[index].y && actual.LAO == expected[index].LAO &&
-            actual.CRAN == expected[index].CRAN;
+            actual.CRAN == expected[index].CRAN && actual.A3 == expected[index].A3;
     }
-    Check(versionedDirections, "revision-3 CAN direction enum preserves all eight joystick directions");
+    Check(versionedDirections, "revision-4 CAN direction enum preserves all ten joystick directions");
     TPCANMsg incompatible{};
     incompatible.LEN = 8;
     incompatible.DATA[0] = RTMC_CAN_PROTOCOL_VERSION - 1;
@@ -196,6 +197,16 @@ void TestPrediction() {
     Check(invalidPredictor.Predict(Request(clearScene, Direction(1, 0, 0, 0))).verdict ==
               eCollisionVerdict::Unknown,
           "invalid prediction settings cannot produce a clear result");
+
+    CollisionRequest homeA3 = Request(clearScene, Direction(0, 0, 0, 0, 1));
+    Check(clearPredictor.Predict(homeA3).verdict == eCollisionVerdict::Unknown,
+          "A3 preflight at exact home is denied because the complete stop leaves the workspace");
+    CollisionRequest interiorA3 = Request(clearScene, Direction(0, 0, 0, 0, 1));
+    interiorA3.currentPosition.X = 50.0;
+    cDriveCalculator calculator;
+    calculator.CalculateInverseKinematics(interiorA3.currentPosition, interiorA3.currentAxles);
+    Check(clearPredictor.Predict(interiorA3).verdict == eCollisionVerdict::Clear,
+          "A3 preflight uses the independent carrier arc and clears it in open workspace");
 }
 
 void TestReferenceScene() {

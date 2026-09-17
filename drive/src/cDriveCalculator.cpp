@@ -10,6 +10,7 @@ namespace {
 constexpr double PI = 3.14159265358979323846;
 
 inline double ToDegrees(double radians) { return radians * 180.0 / PI; }
+inline double ToRadians(double degrees) { return degrees * PI / 180.0; }
 
 inline bool WithinLimit(double value, double lower, double upper, double tolerance) {
     return value >= lower - tolerance && value <= upper + tolerance;
@@ -46,9 +47,14 @@ inline drivePosition ClampToLimits(const drivePosition& pos) {
 }
 
 eKinematicStatus SolveIK(const drivePosition& targetPos, AxelPostion& axelPos, double tolerance) {
-    // Target expressed in the base frame.
-    const double x = targetPos.X - BASE_X_CM;
-    const double y = targetPos.Y - BASE_Y_CM;
+    // The two-link chain ends at the column foot. The public X/Y coordinate is
+    // the imaging centre, 115 cm along the retained carrier heading.
+    const double yaw = ToRadians(targetPos.Yaw);
+    const double columnX = targetPos.X + COLUMN_TO_ISOCENTER_CM -
+                           COLUMN_TO_ISOCENTER_CM * std::cos(yaw);
+    const double columnY = targetPos.Y - COLUMN_TO_ISOCENTER_CM * std::sin(yaw);
+    const double x = columnX - BASE_X_CM;
+    const double y = columnY - BASE_Y_CM;
     const double distance = std::sqrt(x * x + y * y);
 
     axelPos.A3 = 0.0;
@@ -81,7 +87,7 @@ eKinematicStatus SolveIK(const drivePosition& targetPos, AxelPostion& axelPos, d
 
     axelPos.A1 = ToDegrees(a1);
     axelPos.A2 = ToDegrees(a2);
-    axelPos.A3 = -(axelPos.A1 + axelPos.A2);
+    axelPos.A3 = targetPos.Yaw - (axelPos.A1 + axelPos.A2);
 
     if (!WithinLimit(axelPos.A1, A1_MIN_DEG, A1_MAX_DEG, tolerance) ||
         !WithinLimit(axelPos.A2, A2_MIN_DEG, A2_MAX_DEG, tolerance) ||
@@ -107,10 +113,14 @@ drivePosition cDriveCalculator::CalculateForwardKinematics(const AxelPostion& ax
     const double a12 = (axelPos.A1 + axelPos.A2) * PI / 180.0;
 
     drivePosition pos{};
-    pos.X = BASE_X_CM + LINK1_LEN_CM * std::cos(a1) + LINK2_LEN_CM * std::cos(a12);
-    pos.Y = BASE_Y_CM + LINK1_LEN_CM * std::sin(a1) + LINK2_LEN_CM * std::sin(a12);
+    const double heading = ToRadians(axelPos.A1 + axelPos.A2 + axelPos.A3);
+    const double columnX = BASE_X_CM + LINK1_LEN_CM * std::cos(a1) + LINK2_LEN_CM * std::cos(a12);
+    const double columnY = BASE_Y_CM + LINK1_LEN_CM * std::sin(a1) + LINK2_LEN_CM * std::sin(a12);
+    pos.X = columnX - COLUMN_TO_ISOCENTER_CM + COLUMN_TO_ISOCENTER_CM * std::cos(heading);
+    pos.Y = columnY + COLUMN_TO_ISOCENTER_CM * std::sin(heading);
     pos.LAO = axelPos.A4;
     pos.CRAN = axelPos.A5;
+    pos.Yaw = axelPos.A1 + axelPos.A2 + axelPos.A3;
     return pos;
 }
 
@@ -131,14 +141,31 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
                                                          drivePosition& nextPos,
                                                          AxelPostion& nextAxel,
                                                          double deltaTimeMs) {
+    AxelPostion currentAxel{};
+    const eKinematicStatus status = ValidatePose(currentPos, currentAxel, GEOM_EPS);
+    if (status != eKinematicStatus::Ok) {
+        nextPos = currentPos;
+        nextAxel = currentAxel;
+        return status;
+    }
+    return CalculateNextPosition(currentPos, currentAxel, signal, nextPos, nextAxel,
+                                 deltaTimeMs);
+}
+
+eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& currentPos,
+                                                         const AxelPostion& currentAxel,
+                                                         const joystickSignal& signal,
+                                                         drivePosition& nextPos,
+                                                         AxelPostion& nextAxel,
+                                                         double deltaTimeMs) {
     const double deltaSeconds = deltaTimeMs / 1000.0;
 
     // Hold position by default, so every early return still hands back a pose
     // that is safe to commit.
     // The pose we already hold is checked tolerantly - home sits exactly on two
     // joint limits and the inner reach circle.
-    AxelPostion currentAxel{};
-    const eKinematicStatus currentStatus = ValidatePose(currentPos, currentAxel, GEOM_EPS);
+    AxelPostion solvedCurrent{};
+    const eKinematicStatus currentStatus = ValidatePose(currentPos, solvedCurrent, GEOM_EPS);
     nextPos = currentPos;
     nextAxel = currentAxel;
 
@@ -148,11 +175,94 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
     }
 
     const bool idle = signal.x == 0.0 && signal.y == 0.0 &&
-                      signal.LAO == 0.0 && signal.CRAN == 0.0;
+                      signal.LAO == 0.0 && signal.CRAN == 0.0 && signal.A3 == 0.0;
     if (idle) {
         ResetMotionProfile();
         return eKinematicStatus::Ok;
     }
+
+    // A3 is a physical carrier rotation, not a virtual compensation value.
+    // A1/A2/A4/A5 remain fixed and the public imaging centre follows the
+    // resulting 115 cm arc. Exact home is correctly rejected by X >= 0.
+    if (signal.A3 != 0.0) {
+        m_JointSpeedDps = 0.0;
+        if (currentPos.X <= ENVELOPE_MIN_X_CM + GEOM_EPS &&
+            std::abs(currentPos.Yaw) <= GEOM_EPS) {
+            m_A3SpeedDps = 0.0;
+            return eKinematicStatus::OutsideEnvelope;
+        }
+        m_A3SpeedDps = std::min(MAX_A3_SPEED_DPS,
+                                m_A3SpeedDps + A3_ACCEL_DPSS * deltaSeconds);
+        const double stepA3 = signal.A3 * m_A3SpeedDps * deltaSeconds;
+        const auto evaluateA3 = [&](double fraction, drivePosition& pose,
+                                    AxelPostion& axles) {
+            axles = currentAxel;
+            axles.A3 += fraction * stepA3;
+            pose = CalculateForwardKinematics(axles);
+            if (!WithinLimit(axles.A3, A3_MIN_DEG, A3_MAX_DEG, 0.0))
+                return eKinematicStatus::JointLimit;
+            if (!WithinLimit(pose.X, ENVELOPE_MIN_X_CM, ENVELOPE_MAX_X_CM, 0.0) ||
+                !WithinLimit(pose.Y, ENVELOPE_MIN_Y_CM, ENVELOPE_MAX_Y_CM, 0.0))
+                return eKinematicStatus::OutsideEnvelope;
+            return eKinematicStatus::Ok;
+        };
+        const auto evaluateA3Path = [&](double fraction, drivePosition& pose,
+                                        AxelPostion& axles) {
+            const eKinematicStatus endpoint = evaluateA3(fraction, pose, axles);
+            if (endpoint != eKinematicStatus::Ok) return endpoint;
+            const double startHeading = ToRadians(currentAxel.A1 + currentAxel.A2 +
+                                                   currentAxel.A3);
+            const double headingDelta = ToRadians(stepA3 * fraction);
+            if (std::abs(headingDelta) <= GEOM_EPS) return eKinematicStatus::Ok;
+            const double lower = std::min(startHeading, startHeading + headingDelta);
+            const double upper = std::max(startHeading, startHeading + headingDelta);
+            const int first = static_cast<int>(std::ceil(lower / (PI / 2.0)));
+            const int last = static_cast<int>(std::floor(upper / (PI / 2.0)));
+            for (int k = first; k <= last; ++k) {
+                const double crossing = k * PI / 2.0;
+                const double pathFraction = (crossing - startHeading) /
+                                            ToRadians(stepA3);
+                if (pathFraction <= 0.0 || pathFraction >= fraction) continue;
+                drivePosition crossingPose{};
+                AxelPostion crossingAxles{};
+                const eKinematicStatus status = evaluateA3(pathFraction, crossingPose,
+                                                            crossingAxles);
+                if (status != eKinematicStatus::Ok) return status;
+            }
+            return eKinematicStatus::Ok;
+        };
+        drivePosition fullPose{};
+        AxelPostion fullAxles{};
+        const eKinematicStatus fullStatus = evaluateA3Path(1.0, fullPose, fullAxles);
+        if (fullStatus == eKinematicStatus::Ok) {
+            nextPos = fullPose;
+            nextAxel = fullAxles;
+            return eKinematicStatus::Ok;
+        }
+        double feasible = 0.0, infeasible = 1.0;
+        drivePosition feasiblePose = currentPos;
+        AxelPostion feasibleAxles = currentAxel;
+        for (int i = 0; i < FEASIBILITY_ITERATIONS; ++i) {
+            const double middle = 0.5 * (feasible + infeasible);
+            drivePosition probePose{};
+            AxelPostion probeAxles{};
+            if (evaluateA3Path(middle, probePose, probeAxles) == eKinematicStatus::Ok) {
+                feasible = middle;
+                feasiblePose = probePose;
+                feasibleAxles = probeAxles;
+            } else {
+                infeasible = middle;
+            }
+        }
+        if (feasible < 1e-9) {
+            feasiblePose = currentPos;
+            feasibleAxles = currentAxel;
+        }
+        nextPos = feasiblePose;
+        nextAxel = feasibleAxles;
+        return fullStatus;
+    }
+    m_A3SpeedDps = 0.0;
 
     // Trapezoidal profile: ramp the per-axle speed, then derive this tick's
     // angular budget from it.
@@ -172,6 +282,7 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
         probe.Y    = currentPos.Y    + fraction * stepY;
         probe.LAO  = currentPos.LAO  + fraction * stepLAO;
         probe.CRAN = currentPos.CRAN + fraction * stepCRAN;
+        probe.Yaw  = currentPos.Yaw;
         return probe;
     };
 

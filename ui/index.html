@@ -11,6 +11,7 @@ h1{font-size:20px;margin:0}small{color:#9badc3}.status{color:#5fdfc4;text-align:
 aside{border-left:1px solid #2b3749;background:#111d2d;padding:18px}.warning{color:#ffd48c;background:#392d1c;border:1px solid #6e542e;padding:9px;border-radius:6px;font-size:12px}
 .axes{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:14px 0}.axis{background:#17273a;border:1px solid #30445c;border-radius:5px;padding:7px 3px;text-align:center}.axis b{display:block;color:#5fdfc4;font:11px system-ui}.axis span{font:11px ui-monospace,monospace}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:15px}.pad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,46px);gap:5px}.controls h2{font-size:13px;text-align:center;margin:5px 0 8px}
+.a3-control{margin-top:14px}.a3-control h2{font-size:13px;text-align:center;margin:5px 0 8px}.a3-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.a3-buttons button{min-height:42px}
 button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;cursor:pointer;touch-action:none;padding:6px}button:active{background:#267f77}button:disabled{opacity:.4;cursor:not-allowed}#stop{width:100%;margin:15px 0 10px;padding:11px;border-color:#e39475;background:#53312e}
 #reason{min-height:42px;color:#c2cddd}.latched{color:#ffab89}.stale{color:#ffd48c}@media(max-width:900px){.layout{grid-template-columns:1fr}.stage,canvas{min-height:480px;height:480px}aside{border-left:0;border-top:1px solid #2b3749}}
 </style>
@@ -41,6 +42,9 @@ button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;
     <span></span><button data-btn="R-down">X − head</button><span></span>
    </div></div>
   </div>
+  <div class="a3-control"><h2>A3 carrier yaw</h2><div class="a3-buttons">
+   <button data-btn="A3-left" aria-label="Rotate A3 clockwise; hold to move">A3 rotate left</button><button data-btn="A3-right" aria-label="Rotate A3 counterclockwise; hold to move">A3 rotate right</button>
+  </div></div>
   <button id="stop">Stop / acknowledge</button>
   <div id="reason">Loading model and controller state.</div>
   <small id="feedback">No complete drive feedback sample.</small>
@@ -88,10 +92,12 @@ function draw(){
  }
  faces.sort((a,b)=>a.depth-b.depth);for(const face of faces){ctx.beginPath();face.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.globalAlpha=face.patient?.18:.86;ctx.fillStyle=face.color;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=face.patient?'#e1ae6388':'#0c142077';ctx.stroke();}
  const imaging=point(f.carm,[0,0,0]),ip=project(imaging,w,h),head=project(parameters.patient_fixture.head_center_m,w,h);
+ const pivot=point(f.boom,[0,0,0]),pp=project(pivot,w,h);line(pivot,imaging,'#9badc3',w,h);
+ ctx.fillStyle='#5fdfc4';ctx.beginPath();ctx.arc(pp[0],pp[1],3,0,Math.PI*2);ctx.fill();ctx.fillText('A3 pivot',pp[0]+7,pp[1]+14);
  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ip[0],ip[1],4,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('Imaging center',ip[0]+8,ip[1]-8);
  ctx.strokeStyle='#ffd48c';ctx.beginPath();ctx.arc(head[0],head[1],9,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#ffd48c';ctx.fillText('Patient head · X=0 Y=0',head[0]+12,head[1]+18);
  line([0,0,0],[.4,0,0],'#fc857f',w,h);line([0,0,0],[0,.4,0],'#5fdfc4',w,h);line([0,0,0],[0,0,.4],'#8eaeff',w,h);
- document.getElementById('position').textContent=`EOF X ${imaging[0].toFixed(3)} m · Y ${imaging[1].toFixed(3)} m · pose ${driveState.pose_sequence}`;
+ const heading=q[0]+q[1]+q[2];document.getElementById('position').textContent=`EOF X ${imaging[0].toFixed(3)} m · Y ${imaging[1].toFixed(3)} m · heading ${heading.toFixed(2)}° · pose ${driveState.pose_sequence}`;
 }
 function setControls(enabled){controls.forEach(b=>b.disabled=!enabled);}
 async function post(btn,cmd='',signal){const r=await fetch('/command?btn='+encodeURIComponent(btn)+'&cmd='+cmd,{method:'POST',signal});if(!r.ok)throw Error('Command rejected');return r.json();}
@@ -110,8 +116,8 @@ document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{con
 async function poll(){
  try{
   const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});if(!r.ok)throw Error();const s=await r.json();driveState=s;
-  if(s.feedback_valid&&s.pose_source==='drive_can_feedback'&&Array.isArray(s.axles_deg)&&s.axles_deg.length===5){lastPose=s.axles_deg.slice();lastPose.forEach((v,i)=>document.getElementById('a'+(i+1)).textContent=v.toFixed(2)+'°');}
   const stale=!s.feedback_valid||s.pose_age_ms>300;setControls(!stale);
+  if(!stale&&s.pose_source==='drive_can_feedback'&&Array.isArray(s.axles_deg)&&s.axles_deg.length===5){lastPose=s.axles_deg.slice();lastPose.forEach((v,i)=>document.getElementById('a'+(i+1)).textContent=v.toFixed(2)+'°');}
   const stateNode=document.getElementById('state');stateNode.textContent='Collision supervision · '+s.state;stateNode.className='status '+(s.state.includes('Latched')?'latched':stale?'stale':'');
   document.getElementById('reason').textContent=s.reason+' · Clear permits: '+s.clear_permits;
   document.getElementById('feedback').textContent=stale?'Drive CAN feedback stale — Start inhibited':`Drive CAN feedback · sequence ${s.pose_sequence} · age ${s.pose_age_ms} ms`;

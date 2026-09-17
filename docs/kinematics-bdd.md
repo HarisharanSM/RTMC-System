@@ -228,3 +228,24 @@ The running application must also pass `tests/test_runtime.py`: live telemetry,
 permit renewal, independent timeout stop, predictive pedestal stop with positive
 clearance, latch persistence and Stop/new-Start recovery. This is part of design
 implementation completion, not an optional viewer demonstration.
+
+## UC-9 — Independent A3 carrier yaw
+
+### KIN-26 — Exact-home A3 motion is workspace-blocked
+- **Given** the closed home pose at X=Y=0 and heading zero
+- **When** either A3 direction is requested
+- **Then** the move reports `OutsideEnvelope`
+- **And** no pose or axle change is committed
+
+### KIN-27 — Pure A3 holds the planar arm
+- **Given** a valid interior pose
+- **When** A3 is held
+- **Then** A1/A2/A4/A5 remain fixed and only A3 changes
+- **And** the imaging centre follows the 115 cm carrier arc
+- **And** reported heading equals A1+A2+A3
+
+### KIN-28 — Translation retains selected heading
+- **Given** a nonzero heading selected by an A3 jog
+- **When** X or Y is commanded
+- **Then** the imaging centre translates in patient coordinates
+- **And** A1/A2 are solved while A3 changes as required to preserve heading

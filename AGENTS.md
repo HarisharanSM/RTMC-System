@@ -3,7 +3,7 @@
 ## Project structure and behavior
 
 - C++17 motion-control simulator: input/HTTP in `CANMocker/`, simulated CAN in `PCAN/`, orchestration in `SystemController/`, motion in `drive/`, shared interfaces in `includes/`.
-- `drive/include/cDriveCalculator.h` is the current geometry authority: 75/100 cm links, base=(-25,0) cm, A2 relative to A1, closed EOF=(0,0) aligned to the initial patient head. A3=-(A1+A2) compensates mount yaw; A4=LAO and A5=CRAN. Legacy positions use cm and angles use degrees.
+- `drive/include/cDriveCalculator.h` is the current geometry authority: 75/100 cm links, base=(-25,0) cm, A2 relative to A1, closed EOF=(0,0) aligned to the initial patient head. A3 is independently jogged; world heading is A1+A2+A3 and is retained during X/Y. A4=LAO and A5=CRAN. Legacy positions use cm and angles use degrees.
 - Read `docs/kinematics-model.md` and `docs/kinematics-bdd.md` before changing drive behavior. Preserve accepted-pose/angle agreement and the existing kinematic tests.
 - `collision/` implements simulation-only predictive avoidance following `docs/collision-avoidance/architecture.md`; current coverage and limitations are in `docs/collision-avoidance/implementation.md`. Do not describe it as providing released physical collision protection.
 - Revision-5 collision geometry uses a K-to-world X translation of -1.15 m, then distinct `Column`, `Boom`, `A4Carrier`, `A5Carrier` and `CArm` frames. The neutral C is in XZ and opens toward +X. These synthetic dimensions and the remote-centre carrier are provisional.
@@ -41,7 +41,7 @@ If CMake is unavailable, the test sources are listed in `CMakeLists.txt` and can
 - `pcan_demo` serves one joystick/C-arm canvas page, `GET /state`, model JSON,
   and ordered `POST /command` on loopback port 8082. The generated viewer is an
   offline engineering artifact; the runtime page has no iframe.
-- UI commands use revision-3 CAN frames with direction, sequence and session.
+- UI commands use revision-4 CAN frames with ten explicit directions, sequence and session.
   Accepted drive poses return through coherent fixed-point CAN feedback IDs
   0x301–0x307 before `/state` and the canvas can observe them.
 - Telemetry is simulated commanded feedback, not physical encoder feedback.

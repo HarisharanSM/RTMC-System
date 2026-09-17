@@ -32,7 +32,7 @@ private:
     std::unique_ptr<cDriveCalculator> m_ptrCalculator;
     std::unique_ptr<iCollisionSupervisor> m_CollisionSupervisor;
     std::atomic<eLifecycleState> m_LifecycleState{eLifecycleState::Disarmed};
-    joystickSignal m_ActiveDirection{0, 0, 0, 0};
+    joystickSignal m_ActiveDirection{0, 0, 0, 0, 0};
     std::atomic<std::uint64_t> m_Session{0};
     std::uint64_t m_CollisionSequence = 0;
     std::chrono::steady_clock::time_point m_PermitDeadline{};

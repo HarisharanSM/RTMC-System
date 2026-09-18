@@ -47,8 +47,8 @@ inline constexpr double A5_MAX_DEG =   90.0;
 // arm reaches exactly BASE_X + MAX_REACH = 150 cm.
 inline constexpr double ENVELOPE_MIN_X_CM =   0.0;
 inline constexpr double ENVELOPE_MAX_X_CM = BASE_X_CM + MAX_REACH_CM;
-inline constexpr double ENVELOPE_MIN_Y_CM = -25.0;
-inline constexpr double ENVELOPE_MAX_Y_CM =  25.0;
+inline constexpr double ENVELOPE_MIN_Y_CM = -100.0;
+inline constexpr double ENVELOPE_MAX_Y_CM =  100.0;
 
 // Tolerance for boundary comparisons. The home pose sits exactly on both the
 // inner reach circle and two joint limits, so exact comparisons would reject it.

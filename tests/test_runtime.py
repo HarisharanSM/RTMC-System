@@ -226,6 +226,42 @@ def run(binary):
                 check(hashlib.sha256(scene_bytes).hexdigest()==manifest["files"]["scene.json"] and
                       model["model_id"]==manifest["model_id"],
                       "integrated renderer assets agree with the generated manifest")
+
+            # Regression for the reported CRAN -> Stop -> CAUD failure.  The
+            # return must be evaluated from the bounded stopped profile, not
+            # as if A5 were already travelling at its 60 deg/s ceiling.
+            cran_start=command("L-up","start")
+            for _ in range(20):
+                time.sleep(.05);command("L-up")
+                cran_state=state()
+                if cran_state["axles_deg"][4]>=16.0 or cran_state["state"]=="AvoidanceLatched":
+                    break
+            check(cran_state["state"]=="Running" and cran_state["axles_deg"][4]>=16.0,
+                  "CRAN reaches the reproduced pre-reversal angle")
+            command("none","stop")
+            caud_start=command("L-down","start")
+            check(caud_start["session"]!=cran_start["session"],
+                  "CAUD reversal starts with a fresh collision session")
+            for _ in range(30):
+                time.sleep(.05);command("L-down")
+                caud_state=state()
+                if caud_state["axles_deg"][4]<=0 or caud_state["state"]=="AvoidanceLatched":
+                    break
+            check(caud_state["state"]=="Running" and caud_state["axles_deg"][4]<=0,
+                  "CAUD safely crosses the original A5 position without a false collision stop")
+            command("none","stop")
+            # Return close to neutral so the remaining independent runtime
+            # checks begin from the same reference geometry.
+            command("L-up","start")
+            for _ in range(8):
+                time.sleep(.05);command("L-up")
+                neutral_state=state()
+                if neutral_state["axles_deg"][4]>=0:break
+            command("none","stop")
+            check(abs(state()["axles_deg"][4])<=3.1,
+                  "reversal regression leaves A5 within one command step of neutral")
+
+            initial=state()
             initial_sequence=initial["sequence"]
             # A lost browser/joystick stream must stop without any more drive calls.
             first_start=command("R-up","start")

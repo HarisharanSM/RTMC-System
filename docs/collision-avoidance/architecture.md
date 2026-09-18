@@ -1,5 +1,17 @@
 # Predictive collision avoidance for RTMC-System
 
+**2026-09-18 reversal correction implemented for the simulator:**
+[CRAN/CAUD reversal, clearance analysis and trajectory-permit design](reversal-clearance-analysis.md)
+reproduces the former return stop at +5.7 degrees after CRAN to +16.5 degrees.
+The drive now identifies its bounded simulator profile state, the predictor
+selects the fastest clear angular cap from a finite candidate set, and the
+permit carries that cap back to the single drive owner. The calculator ramps
+toward or down to the cap rather than exceeding the trajectory that was
+certified. Unknown/unmeasured velocity retains maximum-speed fallback. The
+actual `pcan_demo` test now proves that the reproduced CAUD return crosses A5=0
+without a false latch while the existing watchdog and collision-stop checks
+remain active. This is simulation behavior, not released physical protection.
+
 **Implemented simulation design — revision 6 A3 controls:**
 [A3 left/right controls, motion semantics, UI and collision implementation plan](a3-manual-rotation-design.md)
 specifies independent A3 jogging and retained heading. The protocol, drive,
@@ -28,7 +40,11 @@ Prevent a moving positioner from contacting the fixed patient table, equipment, 
 
 The controller requests motion with a direction. An asynchronous preflight check must authorize the initial movement before the actuator receives a movement command. Thereafter a collision worker runs independently of the drive. The drive performs only bounded permission and fault checks on its command path. If a future movement cannot be certified clear with enough room to stop, request a protective stop immediately. Hold the stopped state until a controller Stop acknowledges that motion session; never resume because the obstacle disappears or because the button remains held.
 
-This version avoids collision by withholding movement and stopping. It does not steer around an obstacle, reverse automatically, or silently change the requested heading. Route planning and automatic speed optimization are future features with separate validation.
+This version avoids collision by withholding movement, selecting a bounded
+angular speed cap, and stopping. It does not steer around an obstacle, reverse
+automatically, or silently change the requested heading. Route planning remains
+a future feature; adaptive angular caps are limited to the modeled simulator
+profile and do not constitute physical speed optimization.
 
 “Static” describes an object's world pose, not its mesh file. Robot geometry is normally rigid and preloaded but its pose is dynamic. A fixed table is static only while its installation and attachments remain unchanged. Patients, staff, drapes and loose cables cannot be assumed static during clinical motion. A synthetic patient box is a test obstacle, not a patient sensing system.
 
@@ -522,12 +538,15 @@ braking_travel = v_brake²/(2*b) = 0.0400 m
 total = 0.0900 m
 ```
 
-The additional residual pair margin is 0.010 m. Angular prediction uses its own speed,
-acceleration and braking bounds. Without measured velocity the worker assumes
-configured maximum speed, so some tilt commands can be denied already at
-preflight even though their immediate first step would be clear. This is
-conservative simulation behavior; speed selection would need a permit that
-also constrains the drive's profile before enabling smaller guarded moves.
+The additional residual pair margin is 0.010 m. Angular prediction uses its own
+speed, acceleration and braking bounds. Unknown/unmeasured state assumes the
+configured maximum speed. The simulator additionally marks the calculator's
+profile speed as bounded modeled state. For A4/A5, the worker evaluates 60, 30,
+15, 10 and 5 deg/s caps in descending order and returns the first complete
+reaction/transition/braking sweep it can certify. That cap is part of the
+permit and the drive calculator enforces it with the same 120 deg/s2 ramp
+bound. A currently faster profile is decelerated to a lower cap and that
+transition is included in prediction; it is never instantaneously clamped.
 
 ### 17.5 Mandatory design implementation completion gate
 
@@ -548,6 +567,7 @@ Run the real `pcan_demo` through its HTTP/CAN/drive/worker path. Required eviden
 | LIVE-10 | Disconnect/close UI | No synthetic display extrapolation; stale status shown; backend lease expires |
 | LIVE-11 | Stop process, missing assets, occupied port, worker startup failure | Clean shutdown or explicit failed startup; no unsupervised application mode |
 | LIVE-12 | Regenerate and compare models; run concurrency checks | No drift in generated files; head/alignment tests and sanitizers pass |
+| LIVE-13 | CRAN past +16 degrees, Stop, fresh CAUD Start and hold through zero | Modeled standstill uses a bounded horizon; A5 crosses zero without false latch; any selected lower cap is enforced by drive |
 
 Automated runtime acceptance is `tests/test_runtime.py --binary build/pcan_demo`,
 registered as CTest `runtime_avoidance` when Python 3 is available. It launches
@@ -861,7 +881,9 @@ Prediction retains the 250 ms reaction allowance and 10 mm residual margin from
 section 17.4. It covers speed, possible acceleration, braking distance and swept
 volumes of every relevant body, including rotational corner motion. For each
 renewal, cover the next allowed segment and its worst-case stop. Unknown or
-over-budget prediction is a denial. The changed queue/scheduling path must fit
+over-budget prediction is a denial. Bounded simulator angular state may select
+the fastest clear cap from the finite set in section 17.4; the permit carries
+that cap and the single drive owner ramps toward it. The changed queue/scheduling path must fit
 the existing allowance in measured simulation tests; if it does not, enlarge
 the allowance and revalidate clearances before enabling motion.
 
@@ -933,6 +955,7 @@ Prior 15-check runtime success does not establish this revision's completion.
 | WF-14 | Head/LAO/CRAN and X/Y tests | Head origin, imaging pivot and five-axis FK agree in runtime and index renderer |
 | WF-15 | Model mismatch and startup faults | Motion inhibited with explicit reason; no disabled-avoidance runtime mode |
 | WF-16 | Build, regression and concurrency tests | Existing kinematics/collision/data tests plus new workflow tests pass; sanitizer evidence recorded |
+| WF-17 | CRAN, Stop, then CAUD reversal | Fresh session crosses the original A5 angle under a collision-certified and drive-enforced profile; maximum-speed fallback remains for unknown state |
 
 Record application revision, host/toolchain, CAN fault-injection traces,
 browser checks, pose freshness, stop latency and observed clearance in

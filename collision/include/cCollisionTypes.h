@@ -83,6 +83,7 @@ struct CollisionRequest {
     double linearSpeedMps = 0.0;
     double angularSpeedRadps = 0.0;
     bool velocityMeasured = false;
+    bool velocityModeled = false; // Bounded simulator profile state, not encoder feedback.
 };
 
 struct CollisionPermit {
@@ -93,6 +94,7 @@ struct CollisionPermit {
     std::chrono::steady_clock::time_point expiresAt{};
     double predictedTravelM = 0.0;
     double predictedTravelRad = 0.0;
+    double permittedAngularSpeedRadps = 0.0;
     const char* movingBody = "";
     const char* obstacle = "";
     const char* reason = "";

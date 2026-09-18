@@ -42,7 +42,7 @@ private:
     std::thread m_SafetyMonitor;
     std::mutex m_CommandMutex;
 
-    bool ApplyMotion(const joystickSignal& signal);
+    bool ApplyMotion(const joystickSignal& signal, double permittedSpeedDps = MAX_JOINT_SPEED_DPS);
     bool SubmitCollisionRequest();
     void ProtectiveStop(const char* reason);
     std::string CollisionStopReason() const;

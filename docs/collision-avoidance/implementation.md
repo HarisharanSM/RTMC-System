@@ -1,5 +1,33 @@
 # C++ collision module — implementation status
 
+## 2026-09-18 implemented simulator correction: reversal and low-speed approach
+
+Fresh actual-executable analysis reproduced CRAN 0 → +16.5 degrees followed by
+CAUD stopping at +5.7 degrees. The reported pair was source housing/tabletop;
+the current pair gap was about 109.37 mm, but the assumed 30 degree stopping
+sweep reached -24.3 degrees where the pair gap was about 7.01 mm. Stop and a
+fresh Start still denied the same CAUD direction. Direction is present in the
+trajectory; the runtime always uses maximum-speed fallback and has no permit
+for a slower continuation. The configured 10 mm residual is applied once.
+
+The implemented correction adds a distinct `velocityModeled` source flag and
+publishes the calculator's bounded angular profile speed to collision. Unknown
+or physical velocity still takes the conservative maximum-speed path. For
+LAO/RAO and CRAN/CAUD, the predictor checks a finite descending set of angular
+caps and returns the fastest candidate whose complete reaction, cap transition,
+braking and 3D swept path can be certified. The permit carries that angular cap;
+`cDriveController` passes it to `cDriveCalculator`, which ramps up or down under
+the existing 120 deg/s2 bound and cannot exceed the granted profile.
+
+The 10 mm residual gap, scene geometry, 90 degree A5 limits, sticky stop latch,
+150 ms renewal expiry and controller-Stop rearm contract are unchanged. The
+actual runtime regression now drives CRAN beyond +16 degrees, stops, starts a
+fresh CAUD session and crosses A5=0 without latching. Unit checks cover modeled
+standstill, reduced-cap selection and drive-side cap/deceleration enforcement.
+See [the detailed analysis](reversal-clearance-analysis.md) for remaining
+physical-feedback, protocol, geometry and diagnostic work. The correction is
+simulation-only and does not establish safe physical braking performance.
+
 Revision 4, 2026-09-15. This document records what the repository implements from the [architecture](architecture.md) and [head-side redesign](head-side-clearance-design.md), and what remains dependent on physical machine evidence.
 
 The integrated `index.html` canvas and drive-originated CAN feedback workflow

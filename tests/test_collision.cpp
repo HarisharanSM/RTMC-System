@@ -207,6 +207,70 @@ void TestPrediction() {
     calculator.CalculateInverseKinematics(interiorA3.currentPosition, interiorA3.currentAxles);
     Check(clearPredictor.Predict(interiorA3).verdict == eCollisionVerdict::Clear,
           "A3 preflight uses the independent carrier arc and clears it in open workspace");
+
+    // Regression for a CRAN -> Stop -> CAUD reversal.  The old predictor
+    // always projected the full 60 deg/s stop (30 degrees from rest), which
+    // looked through the neutral pose into a remote table/source near-pass and
+    // denied the safe return.  A modeled standstill may instead receive a
+    // lower certified speed cap whose complete reaction-and-stop path is clear.
+    const auto referenceScene = cSceneRegistry::CreateReferenceScene(true);
+    cTrajectoryPredictor referencePredictor(referenceScene);
+    CollisionRequest caudReturn = Request(referenceScene, Direction(0, 0, 0, -1));
+    caudReturn.currentPosition.CRAN = 5.7;
+    calculator.CalculateInverseKinematics(caudReturn.currentPosition,
+                                          caudReturn.currentAxles);
+    caudReturn.angularSpeedRadps = 0.0;
+    caudReturn.velocityModeled = true;
+    const CollisionPermit caudPermit = referencePredictor.Predict(caudReturn);
+    std::cout << "[INFO] adaptive CAUD verdict=" << ToString(caudPermit.verdict)
+              << " cap_radps=" << caudPermit.permittedAngularSpeedRadps
+              << " travel_rad=" << caudPermit.predictedTravelRad
+              << " pair=" << caudPermit.movingBody << "/" << caudPermit.obstacle
+              << " reason=" << caudPermit.reason << "\n";
+    Check(caudPermit.verdict == eCollisionVerdict::Clear &&
+          caudPermit.permittedAngularSpeedRadps > 0.0,
+          "modeled standstill receives a permit for the safe CAUD return");
+    Check(caudPermit.predictedTravelRad < 10.0 * 3.14159265358979323846 / 180.0,
+          "adaptive permit certifies the complete bounded stop without projecting past neutral");
+
+    CollisionRequest constrainedCran = Request(referenceScene, Direction(0, 0, 0, -1));
+    constrainedCran.currentPosition.CRAN = -20.0;
+    calculator.CalculateInverseKinematics(constrainedCran.currentPosition,
+                                          constrainedCran.currentAxles);
+    constrainedCran.angularSpeedRadps = 0.0;
+    constrainedCran.velocityModeled = true;
+    const CollisionPermit constrainedPermit = referencePredictor.Predict(constrainedCran);
+    Check(constrainedPermit.verdict == eCollisionVerdict::Clear &&
+          constrainedPermit.permittedAngularSpeedRadps > 0.0 &&
+          constrainedPermit.permittedAngularSpeedRadps < 60.0 * 3.14159265358979323846 / 180.0 &&
+          std::string(constrainedPermit.reason) == "clear with collision-limited angular speed",
+          "near geometry receives an enforceable reduced-speed permit instead of a false stop");
+
+    cDriveCalculator cappedCalculator;
+    drivePosition cappedPosition{0, 0, 0, -20.0, 0};
+    AxelPostion cappedAxles{};
+    cappedCalculator.CalculateInverseKinematics(cappedPosition, cappedAxles);
+    double largestCappedStep = 0.0;
+    for (int tick = 0; tick < 20; ++tick) {
+        drivePosition next{};
+        AxelPostion nextAxles{};
+        cappedCalculator.CalculateNextPosition(cappedPosition, cappedAxles,
+            Direction(0, 0, 0, -1), next, nextAxles, 50.0, 15.0);
+        largestCappedStep = std::max(largestCappedStep,
+                                     std::abs(nextAxles.A5 - cappedAxles.A5));
+        cappedPosition = next;
+        cappedAxles = nextAxles;
+    }
+    Check(cappedCalculator.GetProfileSpeedDps() <= 15.0 + 1e-12 &&
+          largestCappedStep <= 0.75 + 1e-9,
+          "drive profile cannot exceed the angular speed granted by collision");
+    drivePosition slowedPosition{};
+    AxelPostion slowedAxles{};
+    cappedCalculator.CalculateNextPosition(cappedPosition, cappedAxles,
+        Direction(0, 0, 0, -1), slowedPosition, slowedAxles, 50.0, 5.0);
+    Check(cappedCalculator.GetProfileSpeedDps() <= 9.0 + 1e-12 &&
+          std::abs(slowedAxles.A5 - cappedAxles.A5) <= 0.45 + 1e-9,
+          "a lower renewed permit is enforced through the bounded deceleration transition");
 }
 
 void TestReferenceScene() {

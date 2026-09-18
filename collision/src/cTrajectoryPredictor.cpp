@@ -10,24 +10,40 @@ namespace {
 
 constexpr double PI = 3.14159265358979323846;
 
-double StoppingTravel(double speed, bool velocityMeasured, double maximumSpeed,
+double StoppingTravel(double speed, bool velocityKnown, double maximumSpeed,
                       double acceleration, double reactionTime, double braking) {
-    speed = std::min(std::abs(speed), maximumSpeed);
+    speed = std::abs(speed);
     // The simulator has commanded pose but no measured velocity. Until a motion
     // backend supplies bounded measured feedback, use maximum speed.
-    if (!velocityMeasured) speed = maximumSpeed;
-    // Acceleration during the reaction window is bounded by the same speed cap
-    // that the drive enforces. The previous expression could predict 90 deg/s
-    // from a 60 deg/s limited drive and unnecessarily reject useful rotation.
-    double accelerationTime = 0.0;
-    if (acceleration > 0.0 && speed < maximumSpeed) {
-        accelerationTime = std::min(reactionTime, (maximumSpeed - speed) / acceleration);
+    if (!velocityKnown) speed = maximumSpeed;
+
+    double speedAtBrake = speed;
+    double reactionTravel = 0.0;
+    if (speed < maximumSpeed && acceleration > 0.0) {
+        const double accelerationTime = std::min(
+            reactionTime, (maximumSpeed - speed) / acceleration);
+        speedAtBrake = std::min(maximumSpeed, speed + acceleration * accelerationTime);
+        reactionTravel = speed * accelerationTime +
+            0.5 * acceleration * accelerationTime * accelerationTime +
+            speedAtBrake * (reactionTime - accelerationTime);
+    } else if (speed > maximumSpeed) {
+        // A lower permit is a ramp-down contract, not an instantaneous clamp.
+        // Bound the transition using the same guaranteed deceleration that is
+        // used for the final stop.
+        const double decelerationTime = std::min(
+            reactionTime, (speed - maximumSpeed) / braking);
+        speedAtBrake = std::max(maximumSpeed, speed - braking * decelerationTime);
+        reactionTravel = speed * decelerationTime -
+            0.5 * braking * decelerationTime * decelerationTime +
+            speedAtBrake * (reactionTime - decelerationTime);
+    } else {
+        reactionTravel = speed * reactionTime;
     }
-    const double speedAtBrake = std::min(maximumSpeed, speed + acceleration * accelerationTime);
-    const double reactionTravel = speed * accelerationTime +
-        0.5 * acceleration * accelerationTime * accelerationTime +
-        speedAtBrake * (reactionTime - accelerationTime);
     return reactionTravel + speedAtBrake * speedAtBrake / (2.0 * braking);
+}
+
+bool IsAdaptiveAngularMotion(const joystickSignal& direction) {
+    return direction.LAO != 0.0 || direction.CRAN != 0.0;
 }
 
 } // namespace
@@ -327,37 +343,67 @@ CollisionPermit cTrajectoryPredictor::Predict(const CollisionRequest& request) c
     result.predictedTravelM = StoppingTravel(request.linearSpeedMps, request.velocityMeasured,
         m_Settings.maximumLinearSpeedMps, m_Settings.maximumLinearAccelerationMps2,
         m_Settings.reactionTimeS, m_Settings.guaranteedLinearDecelerationMps2);
+    const bool angularVelocityKnown = request.velocityMeasured || request.velocityModeled;
     if (request.direction.A3 != 0.0) {
-        result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, request.velocityMeasured,
+        result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, angularVelocityKnown,
             m_Settings.maximumA3SpeedRadps, m_Settings.maximumA3AccelerationRadps2,
             m_Settings.reactionTimeS, m_Settings.guaranteedA3DecelerationRadps2);
-    } else {
-        result.predictedTravelRad = StoppingTravel(request.angularSpeedRadps, request.velocityMeasured,
-            m_Settings.maximumAngularSpeedRadps, m_Settings.maximumAngularAccelerationRadps2,
-            m_Settings.reactionTimeS, m_Settings.guaranteedAngularDecelerationRadps2);
-    }
-    const double feasible = FeasibleFraction(request, result.predictedTravelM,
-                                             result.predictedTravelRad);
-    if (feasible < 0.0) {
-        result.reason = "A3 stopping path exceeds a joint or workspace limit";
-        return result;
+        result.permittedAngularSpeedRadps = m_Settings.maximumA3SpeedRadps;
     }
 
-    const eIntervalResult interval = CheckInterval(request, result.predictedTravelM,
-                                                   result.predictedTravelRad,
-                                                   0.0, feasible, result);
-    if (interval == eIntervalResult::Clear) {
-        result.verdict = eCollisionVerdict::Clear;
-        result.movingBody = "";
-        result.obstacle = "";
-        result.reason = feasible < 1.0 ? "clear through the reachable stopping path" :
-                                        "clear through the predicted stopping path";
-    } else if (interval == eIntervalResult::Hazard) {
-        result.verdict = eCollisionVerdict::Hazard;
-    } else {
-        result.verdict = eCollisionVerdict::Unknown;
+    double angularCandidates[] = {
+        m_Settings.maximumAngularSpeedRadps,
+        m_Settings.maximumAngularSpeedRadps * 0.5,
+        m_Settings.maximumAngularSpeedRadps * 0.25,
+        10.0 * PI / 180.0,
+        5.0 * PI / 180.0
+    };
+    for (double& candidate : angularCandidates)
+        candidate = std::min(candidate, m_Settings.maximumAngularSpeedRadps);
+    std::sort(std::begin(angularCandidates), std::end(angularCandidates),
+              [](double lhs, double rhs) { return lhs > rhs; });
+    const int candidateCount = IsAdaptiveAngularMotion(request.direction) &&
+                               angularVelocityKnown ? 5 : 1;
+    CollisionPermit denial = result;
+    for (int candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex) {
+        CollisionPermit candidate = result;
+        double angularLimit = request.direction.A3 != 0.0 ?
+            m_Settings.maximumA3SpeedRadps : angularCandidates[candidateIndex];
+        candidate.permittedAngularSpeedRadps = angularLimit;
+        if (request.direction.A3 == 0.0) {
+            candidate.predictedTravelRad = StoppingTravel(
+                request.angularSpeedRadps, angularVelocityKnown, angularLimit,
+                m_Settings.maximumAngularAccelerationRadps2,
+                m_Settings.reactionTimeS,
+                m_Settings.guaranteedAngularDecelerationRadps2);
+        }
+
+        const double feasible = FeasibleFraction(request, candidate.predictedTravelM,
+                                                 candidate.predictedTravelRad);
+        if (feasible < 0.0) {
+            candidate.reason = "A3 stopping path exceeds a joint or workspace limit";
+            denial = candidate;
+            continue;
+        }
+        const eIntervalResult interval = CheckInterval(
+            request, candidate.predictedTravelM, candidate.predictedTravelRad,
+            0.0, feasible, candidate);
+        if (interval == eIntervalResult::Clear) {
+            candidate.verdict = eCollisionVerdict::Clear;
+            candidate.movingBody = "";
+            candidate.obstacle = "";
+            candidate.reason = IsAdaptiveAngularMotion(request.direction) &&
+                               angularLimit + 1e-12 < m_Settings.maximumAngularSpeedRadps ?
+                "clear with collision-limited angular speed" :
+                (feasible < 1.0 ? "clear through the reachable stopping path" :
+                                  "clear through the predicted stopping path");
+            return candidate;
+        }
+        candidate.verdict = interval == eIntervalResult::Hazard ?
+            eCollisionVerdict::Hazard : eCollisionVerdict::Unknown;
+        denial = candidate;
     }
-    return result;
+    return denial;
 }
 
 } // namespace RTMCCollision

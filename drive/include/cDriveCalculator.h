@@ -99,7 +99,8 @@ public:
                                            const joystickSignal& signal,
                                            drivePosition& nextPos,
                                            AxelPostion& nextAxel,
-                                           double deltaTimeMs = TIME_DELTA_MS);
+                                           double deltaTimeMs = TIME_DELTA_MS,
+                                           double jointSpeedLimitDps = MAX_JOINT_SPEED_DPS);
 
     /** Advance one tick while preserving the independently driven A3 state. */
     eKinematicStatus CalculateNextPosition(const drivePosition& currentPos,
@@ -107,13 +108,15 @@ public:
                                            const joystickSignal& signal,
                                            drivePosition& nextPos,
                                            AxelPostion& nextAxel,
-                                           double deltaTimeMs = TIME_DELTA_MS);
+                                           double deltaTimeMs = TIME_DELTA_MS,
+                                           double jointSpeedLimitDps = MAX_JOINT_SPEED_DPS);
 
     /** @brief Return the trapezoidal profile to rest. Call on stop/fault/e-stop. */
     void ResetMotionProfile() { m_JointSpeedDps = 0.0; m_A3SpeedDps = 0.0; }
 
     /** @brief Current profile speed in deg/s, for diagnostics and tests. */
     double GetProfileSpeedDps() const { return m_JointSpeedDps; }
+    double GetA3ProfileSpeedDps() const { return m_A3SpeedDps; }
 
 private:
     /**

@@ -140,7 +140,8 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
                                                          const joystickSignal& signal,
                                                          drivePosition& nextPos,
                                                          AxelPostion& nextAxel,
-                                                         double deltaTimeMs) {
+                                                         double deltaTimeMs,
+                                                         double jointSpeedLimitDps) {
     AxelPostion currentAxel{};
     const eKinematicStatus status = ValidatePose(currentPos, currentAxel, GEOM_EPS);
     if (status != eKinematicStatus::Ok) {
@@ -149,7 +150,7 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
         return status;
     }
     return CalculateNextPosition(currentPos, currentAxel, signal, nextPos, nextAxel,
-                                 deltaTimeMs);
+                                 deltaTimeMs, jointSpeedLimitDps);
 }
 
 eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& currentPos,
@@ -157,7 +158,8 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
                                                          const joystickSignal& signal,
                                                          drivePosition& nextPos,
                                                          AxelPostion& nextAxel,
-                                                         double deltaTimeMs) {
+                                                         double deltaTimeMs,
+                                                         double jointSpeedLimitDps) {
     const double deltaSeconds = deltaTimeMs / 1000.0;
 
     // Hold position by default, so every early return still hands back a pose
@@ -266,8 +268,14 @@ eKinematicStatus cDriveCalculator::CalculateNextPosition(const drivePosition& cu
 
     // Trapezoidal profile: ramp the per-axle speed, then derive this tick's
     // angular budget from it.
-    m_JointSpeedDps = std::min(MAX_JOINT_SPEED_DPS,
-                               m_JointSpeedDps + JOINT_ACCEL_DPSS * deltaSeconds);
+    const double enforcedLimit = ClampTo(jointSpeedLimitDps, 0.0, MAX_JOINT_SPEED_DPS);
+    if (m_JointSpeedDps < enforcedLimit) {
+        m_JointSpeedDps = std::min(enforcedLimit,
+                                   m_JointSpeedDps + JOINT_ACCEL_DPSS * deltaSeconds);
+    } else {
+        m_JointSpeedDps = std::max(enforcedLimit,
+                                   m_JointSpeedDps - JOINT_ACCEL_DPSS * deltaSeconds);
+    }
     const double jointBudgetDeg = m_JointSpeedDps * deltaSeconds;
 
     // Requested step, in the units each axis is actually measured in.

@@ -1,5 +1,44 @@
 # Design and implementation verification
 
+## 2026-09-18 reversal correction verification
+
+A fresh optimized C++17 application build reproduced the reported failure:
+CRAN from 0 to +16.5 degrees, controller Stop, then CAUD latched at +5.7 degrees
+with `source_housing / table_top` uncertainty. Stop/new-Start denied again
+without movement. The run used actual HTTP/CAN/controller/drive/collision
+integration; it did not exercise browser pointer events. The process shut down
+after the diagnostic run.
+
+Direct compiled predictor queries confirmed that CAUD at +5.7 checks a 30 degree
+path ending at -24.3. Current pair gap: 109.37 mm; endpoint gap: 7.01 mm. At the
+same initial pose, the opposite sign is Clear. A diagnostic 10 deg/s predictor
+cap with the existing 120 deg/s² braking gives a 2.916667 degree path and Clear;
+this is not evidence of an implemented lower-speed drive/permit contract.
+
+A 0.1 degree sample sweep of A5=0 to +16.5 found minimum included-pair clearance
+20 mm, link1 housing/floor. Sampling is diagnostic, not continuous certification.
+
+The implemented simulator correction was then verified by direct C++17 builds:
+
+- `collision_tests` passes modeled-standstill prediction, reduced-speed permit
+  selection, drive-side cap enforcement, bounded cap reduction and all prior
+  collision checks.
+- `tests/test_runtime.py --binary pcan_demo` passes the actual
+  HTTP/CAN/controller/drive/collision sequence: CRAN reaches at least +16
+  degrees, Stop creates a fresh session, and CAUD crosses A5=0 without a false
+  latch. Existing deadline, A3, 3D collision stop, residual-clearance and
+  reverse-away checks also pass.
+- The generated reference-data check is unchanged by this correction because
+  no scene dimensions, transforms or margins changed.
+
+The standalone kinematic suite still has the checkout's unrelated historical
+KIN-22 expectation of a +25 cm Y envelope while the current geometry authority
+defines +100 cm; that mismatch is not caused by the collision correction and
+was not altered here. Full findings and remaining acceptance requirements are
+in [reversal-clearance-analysis.md](reversal-clearance-analysis.md).
+
+## Historical implementation checks
+
 Date: 2026-09-17. Scope: C++ simulation collision module, five-axis drive
 integration, reproducible synthetic geometry, integrated joystick/C-arm runtime and
 fail-closed startup checks. No hardware test or physical safety release is

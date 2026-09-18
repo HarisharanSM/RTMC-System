@@ -129,8 +129,14 @@ bool cDriveController::SubmitCollisionRequest() {
     request.currentAxles = m_CurrentAxelPosition;
     request.direction = m_ActiveDirection;
     request.linearSpeedMps = MAX_LINEAR_SPEED_CMPS / 100.0;
-    request.angularSpeedRadps = MAX_ANGULAR_SPEED_DPS * 3.14159265358979323846 / 180.0;
+    const bool a3Motion = m_ActiveDirection.A3 != 0.0;
+    const bool angularMotion = a3Motion || m_ActiveDirection.LAO != 0.0 ||
+                               m_ActiveDirection.CRAN != 0.0;
+    const double profileSpeedDps = a3Motion ? m_ptrCalculator->GetA3ProfileSpeedDps() :
+                                              m_ptrCalculator->GetProfileSpeedDps();
+    request.angularSpeedRadps = angularMotion ? profileSpeedDps * 3.14159265358979323846 / 180.0 : 0.0;
     request.velocityMeasured = false;
+    request.velocityModeled = angularMotion;
     m_PermitDeadline = std::chrono::steady_clock::now() + PREFLIGHT_DEADLINE;
     m_MonitorDeadlineNs.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
         m_PermitDeadline.time_since_epoch()).count(), std::memory_order_release);
@@ -195,15 +201,23 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
             return;
         }
 
+        const double permittedSpeedDps = permit.permittedAngularSpeedRadps > 0.0 ?
+            permit.permittedAngularSpeedRadps * 180.0 / 3.14159265358979323846 :
+            MAX_JOINT_SPEED_DPS;
         if (state == eLifecycleState::Preflight && m_pCANController) {
             std::lock_guard<std::mutex> lock(m_CommandMutex);
             if (m_LifecycleState.load(std::memory_order_acquire) != eLifecycleState::Preflight ||
                 m_CollisionSupervisor->IsStopRequested(session)) return;
-            const double commandedSpeed = signal.A3 == 0.0 ? MAX_JOINT_SPEED_DPS :
+            const double commandedSpeed = signal.A3 == 0.0 ? permittedSpeedDps :
                                                              MAX_A3_SPEED_DPS;
             m_pCANController->SetSpeed(static_cast<float>(commandedSpeed));
         }
-        if (!ApplyMotion(signal)) return;
+        if (state == eLifecycleState::Running && m_pCANController) {
+            std::lock_guard<std::mutex> lock(m_CommandMutex);
+            m_pCANController->SetSpeed(static_cast<float>(
+                signal.A3 == 0.0 ? permittedSpeedDps : MAX_A3_SPEED_DPS));
+        }
+        if (!ApplyMotion(signal, signal.A3 == 0.0 ? permittedSpeedDps : MAX_A3_SPEED_DPS)) return;
         m_NextMotionAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
         auto expected = state;
         if (!m_LifecycleState.compare_exchange_strong(expected, eLifecycleState::Running)) return;
@@ -220,12 +234,13 @@ void cDriveController::HandleJoystick(const joystickSignal& signal) {
     ApplyMotion(signal);
 }
 
-bool cDriveController::ApplyMotion(const joystickSignal& signal) {
+bool cDriveController::ApplyMotion(const joystickSignal& signal, double permittedSpeedDps) {
 
     drivePosition nextPosition{};
     AxelPostion nextAxelPosition{};
     m_LastStatus = m_ptrCalculator->CalculateNextPosition(m_CurrentPosition, m_CurrentAxelPosition, signal,
-                                                          nextPosition, nextAxelPosition);
+                                                          nextPosition, nextAxelPosition,
+                                                          TIME_DELTA_MS, permittedSpeedDps);
 
     // The calculator only ever hands back a pose that satisfies the envelope,
     // the reach annulus and every joint limit, so position and angles cannot

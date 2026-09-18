@@ -26,6 +26,19 @@ typedef uint8_t TPCANMessageType;
 #define STOP_DRIVE_MSG      0x003
 #define DRIVE_SIGNAL_MSG    0x004
 
+// Revision-4 coherent drive feedback. 0x201-0x205 remain actuator targets;
+// these IDs describe the simulated drive's accepted position feedback.
+#define DRIVE_STATUS_MSG       0x180
+#define DRIVE_EPOCH_MSG        0x181
+#define DRIVE_POSE_A1_MSG      0x301
+#define DRIVE_POSE_A2_MSG      0x302
+#define DRIVE_POSE_A3_MSG      0x303
+#define DRIVE_POSE_A4_MSG      0x304
+#define DRIVE_POSE_A5_MSG      0x305
+#define DRIVE_POSE_COMMIT_MSG  0x306
+#define DRIVE_SPEED_MSG        0x307
+#define RTMC_CAN_PROTOCOL_VERSION 4
+
 // Requested Custom CAN Message Structure
 typedef struct {
     DWORD            ID;        // CAN ID (11-bit standard or 29-bit extended)

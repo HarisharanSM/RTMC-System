@@ -17,18 +17,21 @@ inline constexpr double MAX_JOINT_SPEED_DPS   = 60.0;   // per-axle speed,      
 inline constexpr double JOINT_ACCEL_DPSS      = 120.0;  // per-axle acceleration, deg/s^2
 inline constexpr double MAX_LINEAR_SPEED_CMPS = 20.0;   // commanded X/Y speed,   cm/s
 inline constexpr double MAX_ANGULAR_SPEED_DPS = 60.0;   // commanded LAO/CRAN,    deg/s
+inline constexpr double MAX_A3_SPEED_DPS      = 10.0;   // commanded A3 yaw,       deg/s
+inline constexpr double A3_ACCEL_DPSS         = 20.0;   // A3 acceleration,        deg/s^2
 
 /**
  * @brief Represents the physical position coordinates of the drive system.
  *
  * (X, Y) is the end-effector position in the world frame, in cm. The origin is
- * defined as the fully-closed pose of A1 and A2 - see docs/kinematics-model.md.
+ * fixed at the initial patient head; A1/A2 are closed at that origin.
  */
 struct drivePosition {
     double X;    // End-effector horizontal coordinate, cm
-    double Y;    // End-effector vertical coordinate, cm
+    double Y;    // End-effector transverse coordinate, cm
     double LAO;  // LAO/RAO angular position, deg
     double CRAN; // CRAN/CAUD angular position, deg
+    double Yaw = 0.0; // Retained C-arm carrier heading (A1 + A2 + A3), deg
 };
 
 /**
@@ -42,6 +45,7 @@ struct joystickSignal {
     double y;    // Right pad Y-axis direction
     double LAO;  // Left pad LAO/RAO direction
     double CRAN; // Left pad CRAN/CAUD direction
+    double A3 = 0.0; // Independent carrier-yaw direction
 };
 
 /**
@@ -49,13 +53,14 @@ struct joystickSignal {
  *
  * A1 is the base axle. A2 is carried on A1's hand end and is measured RELATIVE
  * to link 1 (the textbook 2R elbow angle), not in the world frame: the absolute
- * heading of link 2 is A1 + A2. A3/A4 are pass-through angular axes.
+ * heading of link 2 is A1 + A2. A3 cancels that heading; A4/A5 are LAO/CRAN about the imaging center.
  */
 struct AxelPostion {
     double A1;   // Base axle,               deg
     double A2;   // Elbow axle, relative,    deg
-    double A3;   // LAO/RAO,                 deg
-    double A4;   // CRAN/CAUD,               deg
+    double A3;   // Carrier yaw; total heading is A1 + A2 + A3, deg
+    double A4;   // LAO/RAO, deg
+    double A5 = 0.0; // CRAN/CAUD, deg
 };
 
 /**

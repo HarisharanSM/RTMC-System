@@ -65,8 +65,8 @@ std::string Num(double v, int precision = 6) {
 const double TICK_MS = TIME_DELTA_MS;
 const double TICK_S = TIME_DELTA_MS / 1000.0;
 
-joystickSignal Sig(double x, double y, double lao, double cran) {
-    return joystickSignal{x, y, lao, cran};
+joystickSignal Sig(double x, double y, double lao, double cran, double a3 = 0.0) {
+    return joystickSignal{x, y, lao, cran, a3};
 }
 
 drivePosition Pos(double x, double y, double lao = 0.0, double cran = 0.0) {
@@ -74,7 +74,7 @@ drivePosition Pos(double x, double y, double lao = 0.0, double cran = 0.0) {
 }
 
 bool AnyNaN(const AxelPostion& a) {
-    return std::isnan(a.A1) || std::isnan(a.A2) || std::isnan(a.A3) || std::isnan(a.A4);
+    return std::isnan(a.A1) || std::isnan(a.A2) || std::isnan(a.A3) || std::isnan(a.A4) || std::isnan(a.A5);
 }
 
 bool AnyNaN(const drivePosition& p) {
@@ -134,7 +134,7 @@ RunTrace Drive(cDriveCalculator& calc, drivePosition start, const joystickSignal
         const double jointStep = std::max(std::max(std::abs(nextAxel.A1 - currentAxel.A1),
                                                    std::abs(nextAxel.A2 - currentAxel.A2)),
                                           std::max(std::abs(nextAxel.A3 - currentAxel.A3),
-                                                   std::abs(nextAxel.A4 - currentAxel.A4)));
+                                                   std::max(std::abs(nextAxel.A4 - currentAxel.A4), std::abs(nextAxel.A5 - currentAxel.A5))));
         trace.maxJointStep = std::max(trace.maxJointStep, jointStep);
         trace.maxJointBudgetBreach = std::max(trace.maxJointBudgetBreach, jointStep - budget);
         trace.maxCartesianStep = std::max(trace.maxCartesianStep,
@@ -504,10 +504,23 @@ void UC6_AngularAxes() {
     cDriveCalculator lao;
     const RunTrace run = Drive(lao, Pos(100, 0), Sig(0, 0, 1, 0), 200);
     When("the final LAO is inspected");
-    Then(run.finalPos.LAO <= A3_MAX_DEG + 1e-9,
+    Then(run.finalPos.LAO <= A4_MAX_DEG + 1e-9,
          "LAO never exceeds +180 deg, no epsilon overshoot (got " + Num(run.finalPos.LAO, 9) + ")");
-    AndThen(Near(run.finalPos.LAO, A3_MAX_DEG, 1e-9),
+    AndThen(Near(run.finalPos.LAO, A4_MAX_DEG, 1e-9),
             "LAO saturates exactly at its limit rather than stalling early");
+    EndScenario();
+
+    Scenario("KIN-25", "CRAN/CAUD clamp at 90 degrees in either direction");
+    Given("CRAN and CAUD are each held beyond their configured travel");
+    cDriveCalculator cranCalculator;
+    cDriveCalculator caudCalculator;
+    const RunTrace cran = Drive(cranCalculator, Pos(100, 0), Sig(0, 0, 0, 1), 200);
+    const RunTrace caud = Drive(caudCalculator, Pos(100, 0), Sig(0, 0, 0, -1), 200);
+    When("the final CRAN/CAUD positions are inspected");
+    Then(Near(cran.finalPos.CRAN, A5_MAX_DEG, 1e-9),
+         "CRAN saturates exactly at +90 deg");
+    AndThen(Near(caud.finalPos.CRAN, A5_MIN_DEG, 1e-9),
+            "CAUD saturates exactly at -90 deg");
     EndScenario();
 }
 
@@ -556,6 +569,65 @@ void UC7_Robustness() {
          "the position is unchanged");
     AndThen(Near(idle.GetProfileSpeedDps(), 0.0, 1e-12), "the motion profile is reset");
     AndThen(status == eKinematicStatus::Ok, "status is Ok (got " + std::string(ToString(status)) + ")");
+    EndScenario();
+}
+
+// ---------------------------------------------------------------------------
+// UC-9 - Independent A3 carrier yaw
+// ---------------------------------------------------------------------------
+void UC9_A3CarrierYaw() {
+    Scenario("KIN-26", "A3 jog is blocked at exact home by the workspace envelope");
+    cDriveCalculator homeCalculator;
+    drivePosition home = Pos(0, 0);
+    AxelPostion homeAxles{};
+    homeCalculator.CalculateInverseKinematics(home, homeAxles);
+    drivePosition blockedPose{};
+    AxelPostion blockedAxles{};
+    const auto blocked = homeCalculator.CalculateNextPosition(
+        home, homeAxles, Sig(0, 0, 0, 0, 1), blockedPose, blockedAxles, TICK_MS);
+    Then(blocked == eKinematicStatus::OutsideEnvelope,
+         "home A3 jog reports OutsideEnvelope");
+    AndThen(Near(blockedAxles.A3, homeAxles.A3, 1e-12) &&
+            Near(blockedPose.X, home.X, 1e-12) && Near(blockedPose.Y, home.Y, 1e-12),
+            "no axle or imaging-centre motion is committed");
+    EndScenario();
+
+    Scenario("KIN-27", "A3 jog holds A1/A2 and moves the imaging centre on its carrier arc");
+    cDriveCalculator calculator;
+    drivePosition pose = Pos(50, 0);
+    AxelPostion axles{};
+    calculator.CalculateInverseKinematics(pose, axles);
+    const AxelPostion start = axles;
+    for (int i = 0; i < 20; ++i) {
+        drivePosition nextPose{};
+        AxelPostion nextAxles{};
+        calculator.CalculateNextPosition(pose, axles, Sig(0, 0, 0, 0, 1),
+                                         nextPose, nextAxles, TICK_MS);
+        pose = nextPose;
+        axles = nextAxles;
+    }
+    Then(Near(axles.A1, start.A1, 1e-12) && Near(axles.A2, start.A2, 1e-12),
+         "A1 and A2 remain fixed throughout independent A3 rotation");
+    AndThen(axles.A3 > start.A3 && pose.Y > 0.0 && pose.X < 50.0,
+            "A3 and the imaging-centre arc advance in the requested direction");
+    AndThen(Near(pose.Yaw, axles.A1 + axles.A2 + axles.A3, 1e-10),
+            "reported heading equals A1+A2+A3");
+    EndScenario();
+
+    Scenario("KIN-28", "X/Y translation retains the A3-selected world heading");
+    const double retainedHeading = pose.Yaw;
+    const AxelPostion beforeTranslation = axles;
+    calculator.ResetMotionProfile();
+    drivePosition translated{};
+    AxelPostion translatedAxles{};
+    calculator.CalculateNextPosition(pose, axles, Sig(1, 0, 0, 0),
+                                     translated, translatedAxles, TICK_MS);
+    Then(translated.X > pose.X && Near(translated.Yaw, retainedHeading, 1e-10),
+         "the imaging centre translates while heading remains retained");
+    AndThen(!Near(translatedAxles.A1, beforeTranslation.A1, 1e-8) &&
+            Near(translatedAxles.A1 + translatedAxles.A2 + translatedAxles.A3,
+                 retainedHeading, 1e-8),
+            "A1/A2 solve the translation and A3 preserves the selected heading");
     EndScenario();
 }
 
@@ -614,6 +686,7 @@ int main() {
     UC6_AngularAxes();
     UC7_Robustness();
     UC8_SafetyInterlocks();
+    UC9_A3CarrierYaw();
 
     std::cout << "\n----------------------------------------------------------\n";
     std::cout << "scenarios: " << (g_scenarios - g_scenariosFailed) << "/" << g_scenarios << " passed\n";

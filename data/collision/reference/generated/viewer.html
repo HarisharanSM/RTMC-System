@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RTMC · Collision geometry reference</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0c1420; color: #edf2f7; font: 15px/1.5 system-ui, sans-serif; }
+  header { padding: 24px 30px 18px; border-bottom: 1px solid #2b3749; }
+  .eyebrow { color: #5fdfc4; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+  h1 { margin: 5px 0 6px; font-size: 27px; font-weight: 650; }
+  p { margin: 0; color: #abb9cb; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 660px; }
+  .stage { position: relative; min-height: 660px; }
+  canvas { display: block; width: 100%; height: 660px; touch-action: none; }
+  .note { position: absolute; top: 18px; left: 25px; color: #cbd6e6; font-size: 12px; pointer-events: none; }
+  .footer { position: absolute; bottom: 20px; left: 25px; right: 25px; color: #91a1b7; font-size: 12px; }
+  aside { background: #121e2e; border-left: 1px solid #2b3749; padding: 23px; }
+  .warning { background: #3b2d18; color: #ffd48c; padding: 12px; border: 1px solid #70532d; border-radius: 6px; font-size: 13px; }
+  h2 { font-size: 15px; margin: 24px 0 10px; }
+  label { display: block; margin: 13px 0; font-size: 13px; }
+  input[type=range] { width: 100%; accent-color: #5fdfc4; }
+  output { float: right; color: #5fdfc4; font-variant-numeric: tabular-nums; }
+  button { background: #22334a; color: #edf2f7; border: 1px solid #40516a; padding: 8px 12px; margin: 0 4px 5px 0; border-radius: 5px; cursor: pointer; }
+  button:hover { background: #344b68; }
+  .legend { display: grid; grid-template-columns: 14px 1fr; gap: 7px 8px; font-size: 12px; color: #c4cedb; }
+  .swatch { width: 10px; height: 10px; margin-top: 4px; border-radius: 2px; }
+  #position { color: #d3deec; font: 12px/1.7 ui-monospace, monospace; margin-top: 13px; }
+  @media(max-width:800px) { main { grid-template-columns: 1fr; } aside { border-left: 0; } canvas,.stage { height: 520px; min-height: 520px; } }
+</style>
+<header>
+  <div class="eyebrow">RTMC / engineering reference / revision 2</div>
+  <h1>Predictive avoidance · 3D geometry</h1>
+  <p>Patient-head origin · A3 alignment · A4 LAO / A5 CRAN.</p>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="view" aria-label="Interactive three dimensional reference model"></canvas>
+    <div class="note">Drag to orbit · scroll to zoom · meters / Z up</div>
+    <div class="footer">Offline preview. Open the live joystick console at localhost:8082 to run supervised movement.</div>
+  </div>
+  <aside>
+    <div class="warning">SIMULATION ONLY<br>Assumed housings and table dimensions. Not manufacturer CAD or measured machine geometry.</div>
+    <h2 id="mode">Reference pose</h2><div id="live-status"></div>
+    <button data-pose="home">Closed</button><button data-pose="extended">Extended</button><button data-pose="oblique">Oblique</button>
+    <label>A1 · base <output id="o0"></output><input id="q0" aria-label="A1 base angle" type="range" min="-180" max="10" step="1" value="-180"></label>
+    <label>A2 · relative elbow <output id="o1"></output><input id="q1" aria-label="A2 relative elbow angle" type="range" min="0" max="180" step="1" value="180"></label>
+    <label>A3 · automatic alignment <output id="o2"></output><input id="q2" type="range" min="-180" max="180" step="any" value="0" disabled></label>
+    <label>A4 · LAO <output id="o3"></output><input id="q3" aria-label="A4 LAO angle" type="range" min="-180" max="180" step="any" value="0"></label>
+    <label>A5 · CRAN <output id="o4"></output><input id="q4" aria-label="A5 CRAN angle" type="range" min="-90" max="90" step="any" value="0"></label>
+    <div id="position"></div>
+    <h2>Geometry layers</h2>
+    <div class="legend">
+      <span class="swatch" style="background:#48baa9"></span><span>A1 / A2 positioner and support</span>
+      <span class="swatch" style="background:#c8d6e5"></span><span>C-arm / detector / source</span>
+      <span class="swatch" style="background:#6389bd"></span><span>Fixed table and mattress</span>
+      <span class="swatch" style="background:#e1ae63"></span><span>Synthetic patient exclusion box</span>
+    </div>
+    <label><input id="patient" type="checkbox" checked> Show patient test envelope</label>
+    <button id="reset">Reset camera</button>
+  </aside>
+</main>
+<script>
+const DATA = {"parameters": {"schema_version": 5, "model_id": "rtmc-drawing-assembly-v5", "status": "simulation_only", "hardware_authorization": false, "units": {"length": "m", "angle": "rad", "time": "s"}, "world": "X/Y fixed to initial patient head; Z up; head isocenter (0,0,1.20) m; +X toward feet; planar K axes parallel to world", "provenance": {"repository": {"revision": "927f8153369a2e7bb204955a5d3d742b717702f8", "paths": ["drive/include/cDriveCalculator.h", "includes/commonDrive.h"], "applies_to": ["kinematics.link1_m", "kinematics.link2_m", "kinematics.base_xy_m", "kinematics.joint_limits_deg", "kinematics.home_deg", "kinematics.eof_envelope_xy_m"]}, "manufacturer_reference": {"url": "https://www.siemens-healthineers.com/angio/artis-interventional-angiography-systems/artis-pheno", "accessed": "2026-09-14", "reference_sid_m": 1.3, "reference_usable_clearance_m": 0.955, "applies_to": "Reference dimensions only; not OEM housing CAD or RTMC machine dimensions"}, "assumptions": {"applies_to": "All remaining dimensions, joint frame axes/heights, table pose, room floor extent, preview poses, patient envelope and margin", "measurement_uncertainty_m": null, "calibration_id": null, "note": "Unknown measurement error cannot be replaced by the illustrative simulation margin"}}, "kinematics": {"link1_m": 0.75, "link2_m": 1, "base_xy_m": [-0.25, 0], "joint_limits_deg": [[-180, 10], [0, 180], [-180, 180], [-180, 180], [-90, 90]], "home_deg": [-180, 180, 0, 0, 0], "eof_envelope_xy_m": [[0, 1.5], [-0.25, 0.25]], "world_from_planar_xy_m": [-1.15, 0], "link1_center_z_m": 0.1, "link2_center_z_m": 0.28, "isocenter_z_m": 1.2, "column_foot_z_m": 0.37, "column_height_m": 0.83, "boom_to_gimbal_x_m": 0.31, "gimbal_to_isocenter_x_m": 0.84, "column_to_isocenter_x_m": 1.15, "carm_rotation": "column follows Rz(A1+A2); boom follows Rz(A1+A2+A3); remote center C-arm uses Rz(A1+A2+A3) * Rx(A4) * Ry(A5); A3=-(A1+A2)"}, "robot": {"base_size_m": [0.55, 0.6, 0.25], "link1_cross_section_yz_m": [0.2, 0.16], "link2_cross_section_yz_m": [0.16, 0.14], "elbow_size_m": [0.24, 0.24, 0.25], "column_cross_section_xy_m": [0.18, 0.18], "boom_cross_section_yz_m": [0.18, 0.18], "a3_housing_size_m": [0.24, 0.24, 0.24], "a4_bearing_size_m": [0.2, 0.28, 0.28], "carrier_front_x_m": -0.6, "carrier_arm_size_m": [0.24, 0.1, 0.1], "carrier_half_width_m": 0.32, "carrier_rear_crossbar_size_m": [0.12, 0.74, 0.1], "a5_bearing_size_m": [0.14, 0.14, 0.18], "carm_inner_radius_m": 0.7, "carm_outer_radius_m": 0.84, "carm_depth_y_m": 0.22, "carm_arc_start_deg": 90, "carm_arc_end_deg": 270, "carm_segments": 8, "detector_size_m": [0.48, 0.42, 0.245], "detector_center_m": [0, 0, 0.6], "source_size_m": [0.38, 0.4, 0.285], "source_center_m": [0, 0, -0.62], "source_focal_point_m": [0, 0, -0.65], "detector_image_point_m": [0, 0, 0.65]}, "table": {"mobility": "static", "center_xy_m": [0.9, 0], "top_center_z_m": 0.9, "top_size_m": [2.2, 0.55, 0.1], "pedestal_center_x_m": 1.7, "pedestal_size_m": [0.4, 0.45, 0.75], "base_size_m": [0.9, 0.8, 0.1], "mattress_size_m": [2, 0.53, 0.05]}, "environment": {"floor_size_m": [6, 5, 0.1]}, "patient_fixture": {"enabled": true, "size_m": [1.68, 0.5, 0.3], "note": "Synthetic static test exclusion volume only; no clinical anthropometry or motion coverage", "center_m": [0.96, 0, 1.15], "head_center_m": [0, 0, 1.2], "head_size_m": [0.24, 0.24, 0.24]}, "simulation_pair_margin_m": 0.01, "braking_profile": {"status": "missing_machine_measurements", "guaranteed_joint_deceleration_rad_s2": null, "worst_case_reaction_s": null}, "preview_poses_deg": {"home": [-180, 180, 0, 0, 0], "extended": [0, 0, 0, 0, 0], "oblique": [-60, 100, -40, 25, -15]}}, "scene": {"schema_version": 5, "model_id": "rtmc-drawing-assembly-v5", "status": "simulation_only", "hardware_authorization": false, "units": {"length": "m", "angle": "rad", "time": "s"}, "transform_layout": "row-major 4x4; column vectors; local point to world", "frames": ["world", "link1", "link2", "column", "boom", "a4_carrier", "a5_carrier", "carm"], "bodies": [{"id": "robot_base", "frame": "world", "rigid_body": "robot_base", "mobility": "static", "shape": "box", "size_m": [0.55, 0.6, 0.25], "center_m": [-1.4, 0, 0.125], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "link1_housing", "frame": "link1", "rigid_body": "link1", "mobility": "articulated", "shape": "box", "size_m": [0.75, 0.2, 0.16], "center_m": [0.375, 0, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "elbow_housing", "frame": "link1", "rigid_body": "link1", "mobility": "articulated", "shape": "box", "size_m": [0.24, 0.24, 0.25], "center_m": [0.75, 0, 0.09000000000000001], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "link2_housing", "frame": "link2", "rigid_body": "link2", "mobility": "articulated", "shape": "box", "size_m": [1, 0.16, 0.14], "center_m": [0.5, 0, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "support_column", "frame": "column", "rigid_body": "column", "mobility": "articulated", "shape": "box", "size_m": [0.18, 0.18, 0.83], "center_m": [0, 0, 0.415], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a3_housing", "frame": "column", "rigid_body": "column", "mobility": "articulated", "shape": "box", "size_m": [0.24, 0.24, 0.24], "center_m": [0, 0, 0.83], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "upper_boom", "frame": "boom", "rigid_body": "boom", "mobility": "articulated", "shape": "box", "size_m": [0.31, 0.18, 0.18], "center_m": [0.155, 0, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a4_bearing", "frame": "boom", "rigid_body": "boom", "mobility": "articulated", "shape": "box", "size_m": [0.2, 0.28, 0.28], "center_m": [0.31, 0, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a4_carrier_left", "frame": "a4_carrier", "rigid_body": "a4_carrier", "mobility": "articulated", "shape": "box", "size_m": [0.24, 0.1, 0.1], "center_m": [-0.72, 0.32, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a4_carrier_right", "frame": "a4_carrier", "rigid_body": "a4_carrier", "mobility": "articulated", "shape": "box", "size_m": [0.24, 0.1, 0.1], "center_m": [-0.72, -0.32, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a4_carrier_rear", "frame": "a4_carrier", "rigid_body": "a4_carrier", "mobility": "articulated", "shape": "box", "size_m": [0.12, 0.74, 0.1], "center_m": [-0.84, 0, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a5_bearing_left", "frame": "a4_carrier", "rigid_body": "a4_carrier", "mobility": "articulated", "shape": "box", "size_m": [0.14, 0.14, 0.18], "center_m": [-0.6, 0.32, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "a5_bearing_right", "frame": "a4_carrier", "rigid_body": "a4_carrier", "mobility": "articulated", "shape": "box", "size_m": [0.14, 0.14, 0.18], "center_m": [-0.6, -0.32, 0], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_00", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.14890753591066452, 0, 0.7486087359588319], "rotation_x_rad": 0.0, "rotation_y_rad": -1.7671458676442586, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_01", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.42405278523976925, 0, 0.6346398420641901], "rotation_x_rad": 0.0, "rotation_y_rad": -2.1598449493429825, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_02", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.6346398420641901, 0, 0.4240527852397694], "rotation_x_rad": 0.0, "rotation_y_rad": -2.552544031041707, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_03", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.7486087359588319, 0, 0.14890753591066486], "rotation_x_rad": 0.0, "rotation_y_rad": -2.945243112740431, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_04", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.7486087359588319, 0, -0.14890753591066466], "rotation_x_rad": 0.0, "rotation_y_rad": -3.3379421944391554, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_05", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.6346398420641902, 0, -0.42405278523976925], "rotation_x_rad": 0.0, "rotation_y_rad": -3.730641276137879, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_06", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.4240527852397694, 0, -0.63463984206419], "rotation_x_rad": 0.0, "rotation_y_rad": -4.123340357836604, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "carm_sector_07", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.1534503037177387, 0.22, 0.3277517409870954], "center_m": [-0.14890753591066488, 0, -0.7486087359588319], "rotation_x_rad": 0.0, "rotation_y_rad": -4.516039439535327, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "detector_housing", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.48, 0.42, 0.245], "center_m": [0, 0, 0.6], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "source_housing", "frame": "carm", "rigid_body": "carm", "mobility": "articulated", "shape": "box", "size_m": [0.38, 0.4, 0.285], "center_m": [0, 0, -0.62], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "table_top", "frame": "world", "rigid_body": "fixed_table", "mobility": "static", "shape": "box", "size_m": [2.2, 0.55, 0.1], "center_m": [0.9, 0, 0.9], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "table_pedestal", "frame": "world", "rigid_body": "fixed_table", "mobility": "static", "shape": "box", "size_m": [0.4, 0.45, 0.75], "center_m": [1.7, 0, 0.475], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "table_base", "frame": "world", "rigid_body": "fixed_table", "mobility": "static", "shape": "box", "size_m": [0.9, 0.8, 0.1], "center_m": [1.7, 0, 0.05], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "mattress", "frame": "world", "rigid_body": "fixed_table", "mobility": "static", "shape": "box", "size_m": [2, 0.53, 0.05], "center_m": [0.9, 0, 0.9750000000000001], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "patient_test_envelope", "frame": "world", "rigid_body": "patient_fixture", "mobility": "static", "shape": "box", "size_m": [1.68, 0.5, 0.3], "center_m": [0.96, 0, 1.15], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "patient_head", "frame": "world", "rigid_body": "patient_fixture", "mobility": "static", "shape": "box", "size_m": [0.24, 0.24, 0.24], "center_m": [0, 0, 1.2], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}, {"id": "floor", "frame": "world", "rigid_body": "floor", "mobility": "static", "shape": "box", "size_m": [6, 5, 0.1], "center_m": [0.5, 0, -0.05], "rotation_x_rad": 0.0, "rotation_y_rad": 0.0, "rotation_z_rad": 0.0, "dimension_status": "synthetic_unmeasured", "collision_enabled": true}], "pair_policy": {"default": "check all robot-environment and inter-body robot pairs", "same_rigid_body": "exclude internal primitive overlaps", "adjacent_body_exclusions": [["robot_base", "link1"], ["robot_base", "link2"], ["link1", "link2"], ["link2", "column"], ["column", "boom"], ["boom", "a4_carrier"], ["boom", "carm"], ["a4_carrier", "carm"]], "note": "Only synthetic bearing-interface pairs are excluded. All other inter-body pairs remain active. Preview poses are not certified collision-free."}, "pair_margin_m": 0.01, "uncertainty_status": "unmeasured; margin is illustrative, not a physical bound"}};
+const P = DATA.parameters, scene = DATA.scene;
+const live = new URLSearchParams(location.search).get('live')==='1';
+let liveState=null;
+const canvas = document.getElementById('view'), ctx = canvas.getContext('2d');
+let yaw = -0.85, pitch = 0.48, zoom = 155, dragging = null;
+const identity = () => Array.from({length:4},(_,i)=>Array.from({length:4},(_,j)=>+(i===j)));
+function mul(a,b) {return a.map((row,i)=>row.map((_,j)=>row.reduce((s,_,k)=>s+a[i][k]*b[k][j],0)));}
+function tr(x,y,z) {let m=identity();m[0][3]=x;m[1][3]=y;m[2][3]=z;return m;}
+function rot(axis,a) {let m=identity(),[i,j]={x:[1,2],y:[2,0],z:[0,1]}[axis];m[i][i]=m[j][j]=Math.cos(a);m[i][j]=-Math.sin(a);m[j][i]=Math.sin(a);return m;}
+function point(m,p) {return [0,1,2].map(i=>m[i][3]+p.reduce((s,v,j)=>s+m[i][j]*v,0));}
+function frames(q) {
+  const k=P.kinematics,[a,b,c,d,e5]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
+  const [wx,wy]=k.world_from_planar_xy_m;
+  const e=[x+wx+k.link1_m*Math.cos(a),y+wy+k.link1_m*Math.sin(a)];
+  const f=[e[0]+k.link2_m*Math.cos(a+b),e[1]+k.link2_m*Math.sin(a+b)];
+  const h=rot('z',a+b),aligned=rot('z',a+b+c),top=tr(...f,k.isocenter_z_m);
+  const imaging=mul(mul(top,aligned),tr(k.column_to_isocenter_x_m,0,0));
+  const a4=mul(imaging,rot('x',d)),a5=mul(a4,rot('y',e5));
+  return {world:identity(),link1:mul(tr(x+wx,y+wy,k.link1_center_z_m),rot('z',a)),
+    link2:mul(tr(...e,k.link2_center_z_m),h),column:mul(tr(...f,k.column_foot_z_m),h),
+    boom:mul(top,aligned),a4_carrier:a4,a5_carrier:a5,carm:a5};
+}
+function project(p,w,h) {
+  const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw);
+  const u=c*x-s*y,v=s*x+c*y;
+  return [w/2+zoom*u,h/2-zoom*(z*Math.cos(pitch)-v*Math.sin(pitch)),v*Math.cos(pitch)+z*Math.sin(pitch)];
+}
+function color(body) {
+  if(body.rigid_body==='patient_fixture')return '#e1ae63';
+  if(body.rigid_body==='fixed_table')return '#6389bd';
+  if(body.frame==='carm')return '#c8d6e5';
+  return '#48baa9';
+}
+function draw() {
+  const r=canvas.getBoundingClientRect(),w=r.width,h=r.height,dpr=window.devicePixelRatio||1;
+  canvas.width=w*dpr;canvas.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+  const q=liveState?liveState.axles_deg:[0,1,2,3,4].map(i=>+document.getElementById('q'+i).value);
+  if(!liveState){q[2]=-q[0]-q[1];document.getElementById('q2').value=q[2];}
+  const f=frames(q);
+  q.forEach((v,i)=>document.getElementById('o'+i).value=v.toFixed(2)+'°');
+  const eof=point(f.carm,[0,0,0]), env=P.kinematics.eof_envelope_xy_m;
+  const inEnvelope=eof[0]>=env[0][0]-1e-9&&eof[0]<=env[0][1]+1e-9&&eof[1]>=env[1][0]-1e-9&&eof[1]<=env[1][1]+1e-9;
+  document.getElementById('position').textContent=`EOF X ${eof[0].toFixed(3)} m / Y ${eof[1].toFixed(3)} m · ${inEnvelope?'within':'outside'} command envelope. ${liveState?'Backend: '+liveState.state:'Clearance untested.'}`;
+  function line(a,b,col) {const p=project(a,w,h),q=project(b,w,h);ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(...p.slice(0,2));ctx.lineTo(...q.slice(0,2));ctx.stroke();}
+  ctx.lineWidth=1;
+  for(let i=-3;i<=3;i+=.5){line([i,-2.5,0],[i,2.5,0],'#243246');line([-3,i,0],[3,i,0],'#243246');}
+  const faces=[];
+  for(const b of scene.bodies) {
+    if(b.id==='floor'||(b.rigid_body==='patient_fixture'&&!document.getElementById('patient').checked))continue;
+    const local=mul(tr(...b.center_m),mul(mul(rot('x',b.rotation_x_rad),rot('y',b.rotation_y_rad||0)),rot('z',b.rotation_z_rad||0)));
+    const m=mul(f[b.frame],local);
+    const vertices=[];for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])vertices.push(project(point(m,[x*b.size_m[0]/2,y*b.size_m[1]/2,z*b.size_m[2]/2]),w,h));
+    for(const face of [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]]) {
+      const pts=face.map(i=>vertices[i]);faces.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,col:color(b),patient:b.rigid_body==='patient_fixture'});
+    }
+  }
+  faces.sort((a,b)=>a.depth-b.depth);
+  for(const face of faces) {
+    ctx.beginPath();face.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+    ctx.globalAlpha=face.patient?.18:.86;ctx.fillStyle=face.col;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=face.patient?'#e1ae6388':'#0c142077';ctx.stroke();
+  }
+  const mount=point(f.boom,[0,0,0]), marker=project(mount,w,h);
+  ctx.fillStyle='#5fdfc4';ctx.font='12px system-ui';ctx.fillText('A3',marker[0]+7,marker[1]+6);
+  const center=project(eof,w,h);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(center[0],center[1],4,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('Imaging center',center[0]+9,center[1]-9);
+  const head=project(P.patient_fixture.head_center_m,w,h);
+  ctx.strokeStyle='#ffd48c';ctx.beginPath();ctx.arc(head[0],head[1],9,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#ffd48c';ctx.fillText('Patient head · X=0 Y=0',head[0]+12,head[1]+18);
+  for(const [end,name,col] of [[[.4,0,0],'X','#fc857f'],[[0,.4,0],'Y','#5fdfc4'],[[0,0,.4],'Z','#8eaeff']]) {line([0,0,0],end,col);const t=project(end,w,h);ctx.fillStyle=col;ctx.fillText(name,t[0]+3,t[1]-3);}
+}
+document.querySelectorAll('input').forEach(e=>e.addEventListener('input',draw));
+document.querySelectorAll('[data-pose]').forEach(e=>e.addEventListener('click',()=>{P.preview_poses_deg[e.dataset.pose].forEach((v,i)=>document.getElementById('q'+i).value=v);draw();}));
+document.getElementById('reset').onclick=()=>{yaw=-.85;pitch=.48;zoom=155;draw();};
+canvas.onpointerdown=e=>{dragging=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};
+canvas.onpointermove=e=>{if(!dragging)return;yaw+=(e.clientX-dragging[0])*.007;pitch=Math.max(-.8,Math.min(1.4,pitch+(e.clientY-dragging[1])*.007));dragging=[e.clientX,e.clientY];draw();};
+canvas.onpointerup=canvas.onpointercancel=()=>{dragging=null;};
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(50,Math.min(380,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});
+window.addEventListener('resize',draw);draw();
+if(live) {
+ document.body.classList.add('live');
+ const css=document.createElement('style');
+ css.textContent='.live header,.live .warning,.live [data-pose],.live .legend,.live aside h2:not(#mode),.live aside label:has(#patient),.live #reset{display:none}.live main{min-height:470px;grid-template-columns:minmax(0,1fr) 255px}.live canvas,.live .stage{height:470px;min-height:470px}.live aside{padding:12px}.live label{margin:7px 0}.live h2{margin:0 0 8px}.live #live-status{font-size:12px;color:#5fdfc4}.live input[type=range]{height:12px}.live .footer{bottom:8px;font-size:10px}.live #position{font-size:11px}@media(max-width:650px){.live main{grid-template-columns:1fr}.live aside{display:none}}';
+ document.head.appendChild(css);
+ document.getElementById('mode').textContent='Live axle positions';
+ document.querySelectorAll('input[type=range],[data-pose]').forEach(e=>e.disabled=true);
+ document.querySelector('.footer').textContent='Backend commanded pose · collision supervision runs in pcan_demo · colors identify parts, not clearance.';
+ async function refresh() {
+  try {
+   const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});
+   if(!r.ok)throw Error();liveState=await r.json();
+   liveState.axles_deg.forEach((v,i)=>document.getElementById('q'+i).value=v);
+   document.getElementById('live-status').textContent=liveState.state+' · '+liveState.reason;
+   draw();
+  }catch(e){document.getElementById('live-status').textContent='Disconnected — last pose retained; status unknown';}
+  setTimeout(refresh,100);
+ }refresh();
+}
+</script>
+</html>

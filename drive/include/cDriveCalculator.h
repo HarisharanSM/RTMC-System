@@ -27,6 +27,7 @@ inline constexpr double MAX_REACH_CM = LINK1_LEN_CM + LINK2_LEN_CM;  // 175 - fu
  */
 inline constexpr double BASE_X_CM = -MIN_REACH_CM;
 inline constexpr double BASE_Y_CM = 0.0;
+inline constexpr double COLUMN_TO_ISOCENTER_CM = 115.0;
 
 // Axle travel. A1 = -180 / A2 = 180 is the closed pose; A1 = A2 = 0 is full
 // extension. A1's positive limit covers the upper-corner geometry.
@@ -38,13 +39,16 @@ inline constexpr double A3_MIN_DEG = -180.0;
 inline constexpr double A3_MAX_DEG =  180.0;
 inline constexpr double A4_MIN_DEG = -180.0;
 inline constexpr double A4_MAX_DEG =  180.0;
+// CRAN/CAUD is mechanically limited to 90 degrees in either direction.
+inline constexpr double A5_MIN_DEG =  -90.0;
+inline constexpr double A5_MAX_DEG =   90.0;
 
 // Declared safety envelope, kept consistent with the reach annulus: at Y = 0 the
 // arm reaches exactly BASE_X + MAX_REACH = 150 cm.
 inline constexpr double ENVELOPE_MIN_X_CM =   0.0;
 inline constexpr double ENVELOPE_MAX_X_CM = BASE_X_CM + MAX_REACH_CM;
-inline constexpr double ENVELOPE_MIN_Y_CM = -25.0;
-inline constexpr double ENVELOPE_MAX_Y_CM =  25.0;
+inline constexpr double ENVELOPE_MIN_Y_CM = -100.0;
+inline constexpr double ENVELOPE_MAX_Y_CM =  100.0;
 
 // Tolerance for boundary comparisons. The home pose sits exactly on both the
 // inner reach circle and two joint limits, so exact comparisons would reject it.
@@ -95,13 +99,24 @@ public:
                                            const joystickSignal& signal,
                                            drivePosition& nextPos,
                                            AxelPostion& nextAxel,
-                                           double deltaTimeMs = TIME_DELTA_MS);
+                                           double deltaTimeMs = TIME_DELTA_MS,
+                                           double jointSpeedLimitDps = MAX_JOINT_SPEED_DPS);
+
+    /** Advance one tick while preserving the independently driven A3 state. */
+    eKinematicStatus CalculateNextPosition(const drivePosition& currentPos,
+                                           const AxelPostion& currentAxel,
+                                           const joystickSignal& signal,
+                                           drivePosition& nextPos,
+                                           AxelPostion& nextAxel,
+                                           double deltaTimeMs = TIME_DELTA_MS,
+                                           double jointSpeedLimitDps = MAX_JOINT_SPEED_DPS);
 
     /** @brief Return the trapezoidal profile to rest. Call on stop/fault/e-stop. */
-    void ResetMotionProfile() { m_JointSpeedDps = 0.0; }
+    void ResetMotionProfile() { m_JointSpeedDps = 0.0; m_A3SpeedDps = 0.0; }
 
     /** @brief Current profile speed in deg/s, for diagnostics and tests. */
     double GetProfileSpeedDps() const { return m_JointSpeedDps; }
+    double GetA3ProfileSpeedDps() const { return m_A3SpeedDps; }
 
 private:
     /**
@@ -119,4 +134,5 @@ private:
                                   double tolerance) const;
 
     double m_JointSpeedDps = 0.0;  // trapezoidal profile state, deg/s
+    double m_A3SpeedDps = 0.0;     // independent A3 profile state, deg/s
 };

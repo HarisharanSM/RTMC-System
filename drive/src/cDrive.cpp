@@ -1,4 +1,6 @@
 #include "../include/cDrive.h"
+#include "cCollisionSupervisor.h"
+#include "cSceneRegistry.h"
 #include <iostream>
 
 cDrive::cDrive() {
@@ -11,7 +13,13 @@ cDrive::~cDrive(){
 
 bool cDrive::Initialize(std::shared_ptr<iPCANController> pCANptr) {
     std::cout << "[cDrive] Initialising...\n";
-    m_Controller = std::make_unique<cDriveController>(pCANptr);
+    auto supervisor = std::make_unique<RTMCCollision::cCollisionSupervisor>(
+        RTMCCollision::cSceneRegistry::CreateReferenceScene(true));
+    m_Controller = std::make_unique<cDriveController>(pCANptr, std::move(supervisor));
+    if (m_Controller->GetCurrentErrorCode() != 0) return false;
+    // Publish home through the drive's sequenced CAN feedback path before the
+    // UI connects. Direct controller unit fixtures keep their original counts.
+    if (pCANptr) pCANptr->SetPosition(m_Controller->GetCurrentAxelPosition());
     return true;
 }
 
@@ -37,6 +45,7 @@ void cDrive::SetEmgStop() {
 
 void cDrive::Release() {
     std::cout << "[cDrive] Released.\n";
+    m_Controller.reset();
 }
 
 drivePosition cDrive::GetCurrentPosition() const {

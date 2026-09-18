@@ -5,6 +5,25 @@ joystickSignal cCANDriveHandler::ConvertToJoystickSignal(const TPCANMsg& msg) co
 
     if (msg.LEN < 1) return signal;
     BYTE dataByte = msg.DATA[0];
+    // Revision-4 UI frames carry version, direction enum, input sequence and
+    // session. One-byte bit masks remain accepted by isolated legacy fixtures.
+    if (msg.LEN == 8) {
+        if (msg.DATA[0] != RTMC_CAN_PROTOCOL_VERSION) return signal;
+        switch (msg.DATA[1]) {
+            case 1: signal.x = 1.0; break;
+            case 2: signal.x = -1.0; break;
+            case 3: signal.y = 1.0; break;
+            case 4: signal.y = -1.0; break;
+            case 5: signal.CRAN = 1.0; break;
+            case 6: signal.CRAN = -1.0; break;
+            case 7: signal.LAO = 1.0; break;
+            case 8: signal.LAO = -1.0; break;
+            case 9: signal.A3 = -1.0; break;
+            case 10: signal.A3 = 1.0; break;
+            default: break;
+        }
+        return signal;
+    }
 
     // Isolate bits safely using bitwise masks
     bool bit0 = (dataByte & (1 << 0)) != 0; // R-up

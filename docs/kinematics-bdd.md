@@ -6,7 +6,8 @@ printed by the test binary.
 Fixture constants: `L1 = 75 cm`, `L2 = 100 cm`, `BASE = (-25, 0) cm`,
 `tick = 50 ms`, `MAX_LINEAR_SPEED = 20 cm/s`, `MAX_ANGULAR_SPEED = 60 deg/s`,
 `MAX_JOINT_SPEED = 60 deg/s`, `JOINT_ACCEL = 120 deg/s²`,
-`A1 ∈ [-180, 10]°`, `A2 ∈ [0, 180]°`, `A3, A4 ∈ [-180, 180]°`.
+`A1 ∈ [-180, 10]°`, `A2 ∈ [0, 180]°`, `A3, A4 ∈ [-180, 180]°`,
+`A5 ∈ [-90, 90]°`.
 
 ---
 
@@ -140,7 +141,7 @@ that** commanded speeds are physically achievable.
 ### KIN-12 — Per-tick joint step never exceeds the profile budget
 - **Given** the drive is started at a mid-workspace pose (100, 0)
 - **When** "+X" is held for 100 ticks
-- **Then** on every tick, max(|ΔA1|, |ΔA2|, |ΔA3|, |ΔA4|) ≤ profile speed × dt
+- **Then** on every tick, max(|ΔA1|, |ΔA2|, |ΔA3|, |ΔA4|, |ΔA5|) ≤ profile speed × dt
   + 1e-6
 
 ### KIN-13 — Speed ramps rather than stepping to maximum
@@ -177,6 +178,11 @@ that** commanded speeds are physically achievable.
 - **Given** LAO is driven positive for 200 ticks
 - **Then** LAO saturates at +180° and never exceeds it
 
+### KIN-25 — CRAN/CAUD clamp at ±90°
+- **Given** CRAN or CAUD is held beyond its configured travel
+- **Then** CRAN saturates exactly at +90° and CAUD at −90°
+- **And** neither direction wraps, overshoots or renews numerical creep
+
 ---
 
 ## UC-7 — Numerical robustness
@@ -208,3 +214,38 @@ that** commanded speeds are physically achievable.
 - **When** "+X" is held for 10 ticks
 - **Then** the position does not change
 - **And** after `SetError(0)` the arm moves again
+
+## Five-axis patient-head additions
+
+The existing 24 scenarios remain regression requirements. Additional executable
+checks in `tests/test_collision.cpp` verify A3 compensation over multiple X/Y
+poses, five-axis IK/FK, LAO=A4 and CRAN=A5, stationary head pivot under combined
+tilt, and nonzero box-corner sweep under pure A5 rotation. Artifact tests verify
+that the head center and home imaging center coincide and that compensated
+translations preserve the C-arm orientation.
+
+The running application must also pass `tests/test_runtime.py`: live telemetry,
+permit renewal, independent timeout stop, predictive pedestal stop with positive
+clearance, latch persistence and Stop/new-Start recovery. This is part of design
+implementation completion, not an optional viewer demonstration.
+
+## UC-9 — Independent A3 carrier yaw
+
+### KIN-26 — Exact-home A3 motion is workspace-blocked
+- **Given** the closed home pose at X=Y=0 and heading zero
+- **When** either A3 direction is requested
+- **Then** the move reports `OutsideEnvelope`
+- **And** no pose or axle change is committed
+
+### KIN-27 — Pure A3 holds the planar arm
+- **Given** a valid interior pose
+- **When** A3 is held
+- **Then** A1/A2/A4/A5 remain fixed and only A3 changes
+- **And** the imaging centre follows the 115 cm carrier arc
+- **And** reported heading equals A1+A2+A3
+
+### KIN-28 — Translation retains selected heading
+- **Given** a nonzero heading selected by an A3 jog
+- **When** X or Y is commanded
+- **Then** the imaging centre translates in patient coordinates
+- **And** A1/A2 are solved while A3 changes as required to preserve heading

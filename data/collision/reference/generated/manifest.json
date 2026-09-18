@@ -1,0 +1,27 @@
+{
+  "files": {
+    "frames/a4_carrier.obj": "941abab8b52b9ce05ad56ee7fdb5b9d8c1836a5906034b97c081a2a8bbfe1a44",
+    "frames/a5_carrier.obj": "8b4cafe59b2a24edaa9751dbac7f139e60e47f8a9437508e725c89c207d22e0e",
+    "frames/boom.obj": "11845b3c8d4a298255326ed4f33001a4c6a1b21be9e6a445bb7a513575bcec79",
+    "frames/carm.obj": "0c2e6d7506c091498ac3dc516b03952484654ad43b376fea7bdff3b71cc8645e",
+    "frames/column.obj": "c7fb370870b5dd0d34c48e138a26457a34a32f3d3354faddd766db4160293442",
+    "frames/link1.obj": "163b246e7d75edbffeaa951262dab46d79b24f8b5d6779e2c9591e8c0b5a4eb6",
+    "frames/link2.obj": "15b3a647d726e2f2137a0a3b6e5510ca3de35a25374b2d47e636b959f7317dc9",
+    "frames/world.obj": "792c7f7665f495434631d21f314affc5009dad5102dd008a2da79899a89f6a74",
+    "poses/extended.json": "1b7e6019d3d9cf95f18f86dcb5c7c9f4642ba9dc8f9142e1c8369df7b6f2acf1",
+    "poses/extended.obj": "b6bfdce6401396fe6c1dabefd548a04b5ce8b051cc987b0faa76ab62f734b5cf",
+    "poses/home.json": "8987b3beb6ef6cfaf41871402b4160da5b9faf968903721af90cf980d8f1c070",
+    "poses/home.obj": "1efd752225d10723263af2e79c9568325c2b3fd2a5797909a84d6c4c4500e1ab",
+    "poses/oblique.json": "ab4f4b99fd94a44adb59301c684a182622fe93cbebcaeb8874b78f2a374c4499",
+    "poses/oblique.obj": "b3c5a890a63cc52c7ff7857eed1b3f48da8d4bbb4344edda1e80aca696bd2f76",
+    "scene.json": "ff3a1ba71a21264edc10f03106208cac0a377ab36c488793bf864906ca42ed62",
+    "scene_data.inc": "2a51b197b01825d5b8ef0205e3ce90deaa9c2dfd7ae2e5dfe9014300494998d8",
+    "viewer.html": "663280946f8c730c269e8b5372c1ae19434d3c43cf0123e2e893c5a53273e18e"
+  },
+  "generator_sha256": "0cbc029ba5283e7b3393ab2da7509f00e162a342c868504f81074023839ebd1c",
+  "hardware_authorization": false,
+  "model_id": "rtmc-drawing-assembly-v5",
+  "parameter_sha256": "e809a9599d785c623f6e7a82acb797afd4aa8fe0900f6aa0de12fb132149d6c3",
+  "status": "simulation_only",
+  "viewer_template_sha256": "b361d6f4e043ebd04baaf42343a6a46c39a6ec3bf55730129386418ce653b81b"
+}

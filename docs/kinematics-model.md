@@ -7,7 +7,23 @@ The positioner is a 2-link planar arm rotating about a common Z axis:
 - **A1** — base axle.
 - **A2** — mounted on A1's hand end; its own hand end carries the C-arm.
 - The combination of A1 and A2 yields the end-effector (EOF) position **(X, Y)**.
-- **A3 / A4** — LAO/RAO and CRAN/CAUD, pass-through angular axes.
+- **A3** — independently jogged Z-axis carrier yaw at the link-2 endpoint. The retained world heading is `psi=A1+A2+A3`; neutral translation uses `psi=0` and therefore `A3=-(A1+A2)`.
+- **A4 / A5** — LAO/RAO and CRAN/CAUD, about the moving imaging center.
+
+Revision 2 fixes the patient head at `(0,0,1.20)` m. X/Y are always offsets from
+that initial head frame; +X points toward the feet, Y is transverse, Z is up.
+A1/A2 planar geometry and the closed-home numeric coordinates are unchanged.
+A3 initially removes link heading from the support and C-arm orientation. An A3
+jog changes the retained heading and moves the offset imaging centre on a 115 cm
+arc while A1/A2 remain fixed. Later X/Y movement preserves that heading by
+solving `A3=psi-(A1+A2)`. LAO/CRAN keep the current imaging
+center fixed; at X=Y=0 this is the head. See the detailed five-axis contract and
+runtime completion gate in [the avoidance architecture](collision-avoidance/architecture.md#17-five-axis-head-reference-and-live-runtime-completion).
+
+The public X/Y pose is the imaging centre, not the two-link endpoint. With
+column pivot `M`, carrier length `d=115 cm` and heading `psi`, forward kinematics
+reports `I=M-<115,0>+Rz(psi)<115,0>` in the existing patient-head coordinates.
+At `psi=0` all previous numeric X/Y behavior is unchanged.
 
 Every 50 ms, while a UI button is held, the backend receives an input. X or Y is
 incremented in the direction commanded, **bounded by what A1 and A2 can actually
@@ -122,7 +138,7 @@ values:
 
 ```
 A1 in [-180, +10] deg      A2 in [0, 180] deg
-A3 in [-180, +180] deg     A4 in [-180, +180] deg
+A3 in [-180, +180] deg     A4 in [-180, +180] deg     A5 in [-90, +90] deg
 ```
 
 A1 = −180° and A2 = 180° are the closed pose; A1 = A2 = 0° is full extension.

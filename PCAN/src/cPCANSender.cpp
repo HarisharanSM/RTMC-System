@@ -50,11 +50,5 @@ bool cPCANSender::SendMessage(DWORD id, TPCANMessageType msgType, BYTE len, cons
     // In production: DWORD result = CAN_Write(m_Channel, &msg);
     // return (result == PCAN_ERROR_OK);
     
-    std::cout << "[cPCANSender] Sending ID: 0x" << std::hex << msg.ID 
-              << " | Type: " << (int)msg.MSGTYPE 
-              << " | Len: " << std::dec << (int)msg.LEN << " | Data: ";
-    for(int i=0; i<msg.LEN; i++) std::cout << "0x" << std::hex << (int)msg.DATA[i] << " ";
-    std::cout << "\n";
-    
     return true;
 }

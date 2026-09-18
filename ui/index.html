@@ -1,134 +1,140 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTMC Dual-Joystick Console</title>
-    <style>
-        body {
-            margin: 0; padding: 0; height: 100vh;
-            background-color: #121212; color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex; justify-content: space-between; align-items: center; overflow: hidden;
-        }
-        .wrapper { display: flex; flex-direction: column; align-items: center; }
-        .wrapper-left { margin-left: 40px; }
-        .wrapper-right { margin-right: 40px; }
-        .container-title { font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; }
-        .left-title { color: #00adb5; }
-        .right-title { color: #ff5722; }
-        .control-container {
-            width: 220px; height: 220px; background-color: #1e1e1e; border: 2px solid #333; border-radius: 12px;
-            display: grid; grid-template-areas: ". up ." "left . right" ". down .";
-            grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; padding: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-        .left-pad { border-color: #00adb5; }
-        .right-pad { border-color: #ff5722; }
-        .btn {
-            background-color: #2d2d2d; border: 1px solid #444; color: white; font-size: 1.5rem; font-weight: bold;
-            border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center;
-            transition: all 0.1s ease; user-select: none;
-        }
-        .btn:hover { background-color: #3d3d3d; }
-        .btn:active { background-color: #00adb5; transform: scale(0.95); }
-        .right-pad .btn:active { background-color: #ff5722; }
-        .up { grid-area: up; } .down { grid-area: down; } .left { grid-area: left; } .right { grid-area: right; }
-        .center-status { text-align: center; font-size: 1.2rem; letter-spacing: 2px; color: #888; }
-    </style>
-</head>
-<body>
-
-    <div class="wrapper wrapper-left">
-        <div class="container-title left-title">LAO/RAO, CRAN/CAUD</div>
-        <div class="control-container left-pad">
-            <button class="btn up" data-btn="L-up">▲</button>
-            <button class="btn left" data-btn="L-left">◀</button>
-            <button class="btn right" data-btn="L-right">▶</button>
-            <button class="btn down" data-btn="L-down">▼</button>
-        </div>
-    </div>
-
-    <div class="center-status">
-        <h2>RTMC INTERFACE</h2>
-        <div style="color: #00adb5; font-size: 0.9rem;">● STREAM ACTIVE</div>
-    </div>
-
-    <div class="wrapper wrapper-right">
-        <div class="container-title right-title">X, Y</div>
-        <div class="control-container right-pad">
-            <button class="btn up" data-btn="R-up">▲</button>
-            <button class="btn left" data-btn="R-left">◀</button>
-            <button class="btn right" data-btn="R-right">▶</button>
-            <button class="btn down" data-btn="R-down">▼</button>
-        </div>
-    </div>
-
-    <script>
-        let holdInterval = null;
-        let initialDelayTimeout = null;
-
-        function transmitSignal(buttonId, cmdType = "") {
-            const currentUrl = window.location.href;
-            const backendUrl = currentUrl.replace("-8000.", "-8082.").split('?')[0];
-            
-            // Generate distinct, unambiguous endpoint paths
-            let targetAddress = `${backendUrl}?btn=${buttonId}`;
-            if (cmdType !== "") {
-                targetAddress += `&cmd=${cmdType}`;
-            }
-
-            fetch(targetAddress, {
-                method: 'GET',
-                mode: 'cors'
-            }).catch(err => { /* Drop empty frame responses safely */ });
-        }
-
-        function setupButtonLifecycle(buttonEl) {
-            const buttonId = buttonEl.getAttribute('data-btn');
-            
-            const startAction = (e) => {
-                e.preventDefault();
-                if (holdInterval !== null || initialDelayTimeout !== null) return;
-
-                // 1. Instantly fire StartDrive message flag (0x002)
-                transmitSignal(buttonId, "start");
-
-                // 2. Queue up the continuous streaming loop sequence (0x001)
-                initialDelayTimeout = setTimeout(() => {
-                    holdInterval = setInterval(() => {
-                        transmitSignal(buttonId);
-                    }, 50);
-                }, 50);
-            };
-
-            const stopAction = () => {
-                if (initialDelayTimeout !== null) {
-                    clearTimeout(initialDelayTimeout);
-                    initialDelayTimeout = null;
-                }
-                if (holdInterval !== null) {
-                    clearInterval(holdInterval);
-                    holdInterval = null;
-                }
-                // 3. Fire StopDrive message flag (0x003)
-                transmitSignal("none", "stop");
-            };
-
-            // Dynamic pointer mappings
-            buttonEl.addEventListener('mousedown', startAction);
-            buttonEl.addEventListener('touchstart', startAction, { passive: false });
-            
-            buttonEl.addEventListener('mouseup', stopAction);
-            buttonEl.addEventListener('mouseleave', stopAction);
-            buttonEl.addEventListener('touchend', stopAction);
-        }
-
-        // Initialize listener attachments when page elements land
-        document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll('.btn').forEach(btn => {
-                setupButtonLifecycle(btn);
-            });
-        });
-    </script>
-</body>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RTMC · Integrated C-arm control</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0c1420;color:#edf2f7;font:14px/1.4 system-ui,sans-serif}
+header{padding:14px 22px;border-bottom:1px solid #2b3749;display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}small{color:#9badc3}.status{color:#5fdfc4;text-align:right}.layout{display:grid;grid-template-columns:minmax(500px,1fr) 350px;min-height:calc(100vh - 65px)}
+.stage{position:relative;min-height:610px}canvas{display:block;width:100%;height:100%;min-height:610px;touch-action:none}
+.view-help{position:absolute;left:18px;top:14px;color:#a9b8cb;pointer-events:none}.view-presets{position:absolute;right:18px;top:12px;display:flex;gap:5px}.readout{position:absolute;left:18px;bottom:16px;background:#101b2bd9;border:1px solid #33445b;border-radius:6px;padding:8px 11px;font:12px/1.6 ui-monospace,monospace}
+aside{border-left:1px solid #2b3749;background:#111d2d;padding:18px}.warning{color:#ffd48c;background:#392d1c;border:1px solid #6e542e;padding:9px;border-radius:6px;font-size:12px}
+.axes{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:14px 0}.axis{background:#17273a;border:1px solid #30445c;border-radius:5px;padding:7px 3px;text-align:center}.axis b{display:block;color:#5fdfc4;font:11px system-ui}.axis span{font:11px ui-monospace,monospace}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:15px}.pad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,46px);gap:5px}.controls h2{font-size:13px;text-align:center;margin:5px 0 8px}
+.a3-control{margin-top:14px}.a3-control h2{font-size:13px;text-align:center;margin:5px 0 8px}.a3-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.a3-buttons button{min-height:42px}
+button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;cursor:pointer;touch-action:none;padding:6px}button:active{background:#267f77}button:disabled{opacity:.4;cursor:not-allowed}#stop{width:100%;margin:15px 0 10px;padding:11px;border-color:#e39475;background:#53312e}
+#reason{min-height:42px;color:#c2cddd}.latched{color:#ffab89}.stale{color:#ffd48c}@media(max-width:900px){.layout{grid-template-columns:1fr}.stage,canvas{min-height:480px;height:480px}aside{border-left:0;border-top:1px solid #2b3749}}
+</style>
+<header><div><h1>RTMC · C-arm motion</h1><small>Patient-head coordinates · Five-axis simulated CAN feedback</small></div><div id="state" class="status">Connecting…</div></header>
+<main class="layout">
+ <section class="stage">
+  <canvas id="carm-view" aria-label="Integrated live C-arm movement display"></canvas>
+  <div class="view-help">Drag to orbit · scroll to zoom · X/Y origin at patient head</div>
+  <div class="view-presets"><button data-view="side">Side</button><button data-view="back">Back</button><button data-view="top">Top</button></div>
+  <div id="position" class="readout">Waiting for drive CAN feedback.</div>
+ </section>
+ <aside>
+  <div class="warning">SIMULATION ONLY · 10 mm residual gap · CRAN/CAUD ±90° · Synthetic geometry and braking bounds.</div>
+  <div class="axes">
+   <div class="axis"><b>A1</b><span id="a1">—</span></div><div class="axis"><b>A2</b><span id="a2">—</span></div>
+   <div class="axis"><b>A3</b><span id="a3">—</span></div><div class="axis"><b>A4 LAO</b><span id="a4">—</span></div>
+   <div class="axis"><b>A5 CRAN</b><span id="a5">—</span></div>
+  </div>
+  <div class="controls">
+   <div><h2>A4 LAO / A5 CRAN</h2><div class="pad">
+    <span></span><button data-btn="L-up">CRAN +</button><span></span>
+    <button data-btn="L-left">LAO +</button><span></span><button data-btn="L-right">LAO −</button>
+    <span></span><button data-btn="L-down">CRAN −</button><span></span>
+   </div></div>
+   <div><h2>X / Y from head</h2><div class="pad">
+    <span></span><button data-btn="R-up">X + feet</button><span></span>
+    <button data-btn="R-left">Y +</button><span></span><button data-btn="R-right">Y −</button>
+    <span></span><button data-btn="R-down">X − head</button><span></span>
+   </div></div>
+  </div>
+  <div class="a3-control"><h2>A3 carrier yaw</h2><div class="a3-buttons">
+   <button data-btn="A3-left" aria-label="Rotate A3 clockwise; hold to move">ISO rotate left</button><button data-btn="A3-right" aria-label="Rotate A3 counterclockwise; hold to move">ISO rotate right</button>
+  </div></div>
+  <button id="stop">Stop / acknowledge</button>
+  <div id="reason">Loading model and controller state.</div>
+  <small id="feedback">No complete drive feedback sample.</small>
+ </aside>
+</main>
+<script>
+'use strict';
+const canvas=document.getElementById('carm-view'),ctx=canvas.getContext('2d');
+let parameters=null,scene=null,driveState=null,lastPose=null;
+let yaw=-.85,pitch=.48,zoom=150,dragging=null,active=null,inputEpoch=0,holdAbort=null;
+const controls=[...document.querySelectorAll('[data-btn]')];
+const identity=()=>Array.from({length:4},(_,i)=>Array.from({length:4},(_,j)=>+(i===j)));
+function mul(a,b){return a.map((row,i)=>row.map((_,j)=>row.reduce((s,_,k)=>s+a[i][k]*b[k][j],0)));}
+function tr(x,y,z){const m=identity();m[0][3]=x;m[1][3]=y;m[2][3]=z;return m;}
+function rot(axis,a){const m=identity(),[i,j]={x:[1,2],y:[2,0],z:[0,1]}[axis];m[i][i]=m[j][j]=Math.cos(a);m[i][j]=-Math.sin(a);m[j][i]=Math.sin(a);return m;}
+function point(m,p){return [0,1,2].map(i=>m[i][3]+p.reduce((s,v,j)=>s+m[i][j]*v,0));}
+function frames(q){
+ const k=parameters.kinematics,[a,b,c,d,e]=q.map(v=>v*Math.PI/180),[x,y]=k.base_xy_m;
+ const [wx,wy]=k.world_from_planar_xy_m;
+ const elbow=[x+wx+k.link1_m*Math.cos(a),y+wy+k.link1_m*Math.sin(a)];
+ const end=[elbow[0]+k.link2_m*Math.cos(a+b),elbow[1]+k.link2_m*Math.sin(a+b)];
+ const heading=rot('z',a+b),aligned=rot('z',a+b+c),top=tr(...end,k.isocenter_z_m);
+ const imaging=mul(mul(top,aligned),tr(k.column_to_isocenter_x_m,0,0));
+ const a4=mul(imaging,rot('x',d)),a5=mul(a4,rot('y',e));
+ return {world:identity(),link1:mul(tr(x+wx,y+wy,k.link1_center_z_m),rot('z',a)),
+  link2:mul(tr(...elbow,k.link2_center_z_m),heading),column:mul(tr(...end,k.column_foot_z_m),heading),
+  boom:mul(top,aligned),a4_carrier:a4,a5_carrier:a5,carm:a5};
+}
+function project(p,w,h){const x=p[0]-.45,y=p[1],z=p[2]-.75,c=Math.cos(yaw),s=Math.sin(yaw),u=c*x-s*y,v=s*x+c*y;return[w/2+zoom*u,h/2-zoom*(z*Math.cos(pitch)-v*Math.sin(pitch)),v*Math.cos(pitch)+z*Math.sin(pitch)];}
+function bodyColor(b){if(b.rigid_body==='patient_fixture')return'#e1ae63';if(b.rigid_body==='fixed_table')return'#6389bd';if(b.frame==='carm')return'#c8d6e5';return'#48baa9';}
+function line(a,b,color,w,h){const p=project(a,w,h),q=project(b,w,h);ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();}
+function draw(){
+ const box=canvas.getBoundingClientRect(),w=box.width,h=box.height,dpr=window.devicePixelRatio||1;
+ canvas.width=Math.max(1,w*dpr);canvas.height=Math.max(1,h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ if(!parameters||!scene||!lastPose)return;
+ const q=lastPose,f=frames(q);ctx.lineWidth=1;
+ for(let i=-3;i<=3;i+=.5){line([i,-2.5,0],[i,2.5,0],'#243246',w,h);line([-3,i,0],[3,i,0],'#243246',w,h);}
+ const faces=[];
+ for(const body of scene.bodies){
+  if(body.id==='floor')continue;
+  const local=mul(tr(...body.center_m),mul(mul(rot('x',body.rotation_x_rad),rot('y',body.rotation_y_rad||0)),rot('z',body.rotation_z_rad||0)));
+  const m=mul(f[body.frame],local);
+  const vertices=[];for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])vertices.push(project(point(m,[x*body.size_m[0]/2,y*body.size_m[1]/2,z*body.size_m[2]/2]),w,h));
+  for(const face of[[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]]){const pts=face.map(i=>vertices[i]);faces.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,color:bodyColor(body),patient:body.rigid_body==='patient_fixture'});}
+ }
+ faces.sort((a,b)=>a.depth-b.depth);for(const face of faces){ctx.beginPath();face.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.globalAlpha=face.patient?.18:.86;ctx.fillStyle=face.color;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=face.patient?'#e1ae6388':'#0c142077';ctx.stroke();}
+ const imaging=point(f.carm,[0,0,0]),ip=project(imaging,w,h),head=project(parameters.patient_fixture.head_center_m,w,h);
+ const pivot=point(f.boom,[0,0,0]),pp=project(pivot,w,h);line(pivot,imaging,'#9badc3',w,h);
+ ctx.fillStyle='#5fdfc4';ctx.beginPath();ctx.arc(pp[0],pp[1],3,0,Math.PI*2);ctx.fill();ctx.fillText('A3 pivot',pp[0]+7,pp[1]+14);
+ ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ip[0],ip[1],4,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('Imaging center',ip[0]+8,ip[1]-8);
+ ctx.strokeStyle='#ffd48c';ctx.beginPath();ctx.arc(head[0],head[1],9,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#ffd48c';ctx.fillText('Patient head · X=0 Y=0',head[0]+12,head[1]+18);
+ line([0,0,0],[.4,0,0],'#fc857f',w,h);line([0,0,0],[0,.4,0],'#5fdfc4',w,h);line([0,0,0],[0,0,.4],'#8eaeff',w,h);
+ const heading=q[0]+q[1]+q[2];document.getElementById('position').textContent=`EOF X ${imaging[0].toFixed(3)} m · Y ${imaging[1].toFixed(3)} m · heading ${heading.toFixed(2)}° · pose ${driveState.pose_sequence}`;
+}
+function setControls(enabled){controls.forEach(b=>b.disabled=!enabled);}
+async function post(btn,cmd='',signal){const r=await fetch('/command?btn='+encodeURIComponent(btn)+'&cmd='+cmd,{method:'POST',signal});if(!r.ok)throw Error('Command rejected');return r.json();}
+function stop(){active=null;++inputEpoch;if(holdAbort){holdAbort.abort();holdAbort=null;}post('none','stop',AbortSignal.timeout(500)).catch(()=>{});}
+async function start(event){
+ event.preventDefault();if(active||event.currentTarget.disabled)return;
+ const btn=event.currentTarget.dataset.btn,epoch=++inputEpoch;active=btn;event.currentTarget.setPointerCapture(event.pointerId);
+ try{await post(btn,'start',AbortSignal.timeout(500));while(active===btn&&epoch===inputEpoch){await new Promise(r=>setTimeout(r,50));if(active!==btn||epoch!==inputEpoch)break;holdAbort=new AbortController();await post(btn,'',holdAbort.signal);holdAbort=null;}}
+ catch(e){if(active===btn)stop();}
+}
+controls.forEach(b=>{b.onpointerdown=start;b.onpointerup=stop;b.onpointercancel=stop;b.onlostpointercapture=()=>{if(active)stop();};});
+document.getElementById('stop').onclick=stop;window.addEventListener('blur',()=>{if(active)stop();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&active)stop();});
+canvas.onpointerdown=e=>{dragging=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!dragging)return;yaw+=(e.clientX-dragging[0])*.007;pitch=Math.max(-.8,Math.min(1.4,pitch+(e.clientY-dragging[1])*.007));dragging=[e.clientX,e.clientY];draw();};canvas.onpointerup=canvas.onpointercancel=()=>dragging=null;
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(50,Math.min(380,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});window.addEventListener('resize',draw);
+document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{const view=button.dataset.view;if(view==='side'){yaw=0;pitch=0;}else if(view==='back'){yaw=Math.PI/2;pitch=0;}else{yaw=0;pitch=Math.PI/2;}draw();});
+async function poll(){
+ try{
+  const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});if(!r.ok)throw Error();const s=await r.json();driveState=s;
+  const stale=!s.feedback_valid||s.pose_age_ms>300;setControls(!stale);
+  if(!stale&&s.pose_source==='drive_can_feedback'&&Array.isArray(s.axles_deg)&&s.axles_deg.length===5){lastPose=s.axles_deg.slice();lastPose.forEach((v,i)=>document.getElementById('a'+(i+1)).textContent=v.toFixed(2)+'°');}
+  const stateNode=document.getElementById('state');stateNode.textContent='Collision supervision · '+s.state;stateNode.className='status '+(s.state.includes('Latched')?'latched':stale?'stale':'');
+  document.getElementById('reason').textContent=s.reason+' · Clear permits: '+s.clear_permits;
+  document.getElementById('feedback').textContent=stale?'Drive CAN feedback stale — Start inhibited':`Drive CAN feedback · sequence ${s.pose_sequence} · age ${s.pose_age_ms} ms`;
+  if(stale&&active)stop();draw();
+ }catch(e){setControls(false);document.getElementById('state').textContent='Disconnected · motion status unavailable';document.getElementById('state').className='status stale';if(active)stop();}
+ setTimeout(poll,100);
+}
+async function sha256(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return[...new Uint8Array(bytes)].map(v=>v.toString(16).padStart(2,'0')).join('');}
+async function loadModel(){
+ const replies=await Promise.all(['/model/parameters.json','/model/scene.json','/model/manifest.json'].map(url=>fetch(url,{cache:'no-store'})));
+ if(replies.some(r=>!r.ok))throw Error('model request failed');
+ const [parameterText,sceneText,manifestText]=await Promise.all(replies.map(r=>r.text())),manifest=JSON.parse(manifestText);
+ if(await sha256(parameterText)!==manifest.parameter_sha256||await sha256(sceneText)!==manifest.files['scene.json'])throw Error('model hash mismatch');
+ const loadedParameters=JSON.parse(parameterText),loadedScene=JSON.parse(sceneText);
+ if(loadedParameters.model_id!==manifest.model_id)throw Error('model identity mismatch');
+ parameters=loadedParameters;scene=loadedScene;poll();
+}
+setControls(false);loadModel().catch(()=>{document.getElementById('reason').textContent='Model assets unavailable or mismatched; movement inhibited.';});
+</script>
 </html>

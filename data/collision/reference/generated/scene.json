@@ -1,0 +1,725 @@
+{
+  "bodies": [
+    {
+      "center_m": [
+        -1.4,
+        0,
+        0.125
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "robot_base",
+      "mobility": "static",
+      "rigid_body": "robot_base",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.55,
+        0.6,
+        0.25
+      ]
+    },
+    {
+      "center_m": [
+        0.375,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link1",
+      "id": "link1_housing",
+      "mobility": "articulated",
+      "rigid_body": "link1",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.75,
+        0.2,
+        0.16
+      ]
+    },
+    {
+      "center_m": [
+        0.75,
+        0,
+        0.09000000000000001
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link1",
+      "id": "elbow_housing",
+      "mobility": "articulated",
+      "rigid_body": "link1",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.24,
+        0.25
+      ]
+    },
+    {
+      "center_m": [
+        0.5,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "link2",
+      "id": "link2_housing",
+      "mobility": "articulated",
+      "rigid_body": "link2",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        1,
+        0.16,
+        0.14
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        0.415
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "column",
+      "id": "support_column",
+      "mobility": "articulated",
+      "rigid_body": "column",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.18,
+        0.18,
+        0.83
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        0.83
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "column",
+      "id": "a3_housing",
+      "mobility": "articulated",
+      "rigid_body": "column",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.24,
+        0.24
+      ]
+    },
+    {
+      "center_m": [
+        0.155,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "boom",
+      "id": "upper_boom",
+      "mobility": "articulated",
+      "rigid_body": "boom",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.31,
+        0.18,
+        0.18
+      ]
+    },
+    {
+      "center_m": [
+        0.31,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "boom",
+      "id": "a4_bearing",
+      "mobility": "articulated",
+      "rigid_body": "boom",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.2,
+        0.28,
+        0.28
+      ]
+    },
+    {
+      "center_m": [
+        -0.72,
+        0.32,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "a4_carrier",
+      "id": "a4_carrier_left",
+      "mobility": "articulated",
+      "rigid_body": "a4_carrier",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.1,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        -0.72,
+        -0.32,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "a4_carrier",
+      "id": "a4_carrier_right",
+      "mobility": "articulated",
+      "rigid_body": "a4_carrier",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.1,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        -0.84,
+        0,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "a4_carrier",
+      "id": "a4_carrier_rear",
+      "mobility": "articulated",
+      "rigid_body": "a4_carrier",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.12,
+        0.74,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        -0.6,
+        0.32,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "a4_carrier",
+      "id": "a5_bearing_left",
+      "mobility": "articulated",
+      "rigid_body": "a4_carrier",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.14,
+        0.14,
+        0.18
+      ]
+    },
+    {
+      "center_m": [
+        -0.6,
+        -0.32,
+        0
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "a4_carrier",
+      "id": "a5_bearing_right",
+      "mobility": "articulated",
+      "rigid_body": "a4_carrier",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.14,
+        0.14,
+        0.18
+      ]
+    },
+    {
+      "center_m": [
+        -0.14890753591066452,
+        0,
+        0.7486087359588319
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_00",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -1.7671458676442586,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.42405278523976925,
+        0,
+        0.6346398420641901
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_01",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -2.1598449493429825,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.6346398420641901,
+        0,
+        0.4240527852397694
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_02",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -2.552544031041707,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.7486087359588319,
+        0,
+        0.14890753591066486
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_03",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -2.945243112740431,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.7486087359588319,
+        0,
+        -0.14890753591066466
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_04",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -3.3379421944391554,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.6346398420641902,
+        0,
+        -0.42405278523976925
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_05",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -3.730641276137879,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.4240527852397694,
+        0,
+        -0.63463984206419
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_06",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -4.123340357836604,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        -0.14890753591066488,
+        0,
+        -0.7486087359588319
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "carm_sector_07",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": -4.516039439535327,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.1534503037177387,
+        0.22,
+        0.3277517409870954
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        0.6
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "detector_housing",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.48,
+        0.42,
+        0.245
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        -0.62
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "carm",
+      "id": "source_housing",
+      "mobility": "articulated",
+      "rigid_body": "carm",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.38,
+        0.4,
+        0.285
+      ]
+    },
+    {
+      "center_m": [
+        0.9,
+        0,
+        0.9
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_top",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        2.2,
+        0.55,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        1.7,
+        0,
+        0.475
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_pedestal",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.4,
+        0.45,
+        0.75
+      ]
+    },
+    {
+      "center_m": [
+        1.7,
+        0,
+        0.05
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "table_base",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.9,
+        0.8,
+        0.1
+      ]
+    },
+    {
+      "center_m": [
+        0.9,
+        0,
+        0.9750000000000001
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "mattress",
+      "mobility": "static",
+      "rigid_body": "fixed_table",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        2,
+        0.53,
+        0.05
+      ]
+    },
+    {
+      "center_m": [
+        0.96,
+        0,
+        1.15
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "patient_test_envelope",
+      "mobility": "static",
+      "rigid_body": "patient_fixture",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        1.68,
+        0.5,
+        0.3
+      ]
+    },
+    {
+      "center_m": [
+        0,
+        0,
+        1.2
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "patient_head",
+      "mobility": "static",
+      "rigid_body": "patient_fixture",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        0.24,
+        0.24,
+        0.24
+      ]
+    },
+    {
+      "center_m": [
+        0.5,
+        0,
+        -0.05
+      ],
+      "collision_enabled": true,
+      "dimension_status": "synthetic_unmeasured",
+      "frame": "world",
+      "id": "floor",
+      "mobility": "static",
+      "rigid_body": "floor",
+      "rotation_x_rad": 0.0,
+      "rotation_y_rad": 0.0,
+      "rotation_z_rad": 0.0,
+      "shape": "box",
+      "size_m": [
+        6,
+        5,
+        0.1
+      ]
+    }
+  ],
+  "frames": [
+    "world",
+    "link1",
+    "link2",
+    "column",
+    "boom",
+    "a4_carrier",
+    "a5_carrier",
+    "carm"
+  ],
+  "hardware_authorization": false,
+  "model_id": "rtmc-drawing-assembly-v5",
+  "pair_margin_m": 0.01,
+  "pair_policy": {
+    "adjacent_body_exclusions": [
+      [
+        "robot_base",
+        "link1"
+      ],
+      [
+        "robot_base",
+        "link2"
+      ],
+      [
+        "link1",
+        "link2"
+      ],
+      [
+        "link2",
+        "column"
+      ],
+      [
+        "column",
+        "boom"
+      ],
+      [
+        "boom",
+        "a4_carrier"
+      ],
+      [
+        "boom",
+        "carm"
+      ],
+      [
+        "a4_carrier",
+        "carm"
+      ]
+    ],
+    "default": "check all robot-environment and inter-body robot pairs",
+    "note": "Only synthetic bearing-interface pairs are excluded. All other inter-body pairs remain active. Preview poses are not certified collision-free.",
+    "same_rigid_body": "exclude internal primitive overlaps"
+  },
+  "schema_version": 5,
+  "status": "simulation_only",
+  "transform_layout": "row-major 4x4; column vectors; local point to world",
+  "uncertainty_status": "unmeasured; margin is illustrative, not a physical bound",
+  "units": {
+    "angle": "rad",
+    "length": "m",
+    "time": "s"
+  }
+}

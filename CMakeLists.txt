@@ -68,4 +68,10 @@ if(RTMC_PYTHON_EXECUTABLE)
     add_test(NAME runtime_avoidance COMMAND ${RTMC_PYTHON_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_runtime.py --binary $<TARGET_FILE:pcan_demo>)
     set_tests_properties(runtime_avoidance PROPERTIES RUN_SERIAL TRUE TIMEOUT 40)
+    add_test(NAME command_source COMMAND ${RTMC_PYTHON_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_command_source.py --binary $<TARGET_FILE:pcan_demo>)
+    set_tests_properties(command_source PROPERTIES RUN_SERIAL TRUE TIMEOUT 15)
+    add_test(NAME ros2_adapter_runtime COMMAND ${RTMC_PYTHON_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ros2_adapter_runtime.py --binary $<TARGET_FILE:pcan_demo>)
+    set_tests_properties(ros2_adapter_runtime PROPERTIES RUN_SERIAL TRUE TIMEOUT 15)
 endif()

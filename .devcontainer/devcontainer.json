@@ -1,0 +1,26 @@
+{
+  "name": "RTMC Simulator + ROS 2 Jazzy",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "remoteUser": "vscode",
+  "postCreateCommand": "bash scripts/setup_ros2_codespaces.sh",
+  "forwardPorts": [8082],
+  "portsAttributes": {
+    "8082": {
+      "label": "RTMC simulator (loopback)",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteEnv": {
+    "ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST",
+    "ROS_LOCALHOST_ONLY": "1",
+    "ROS_DOMAIN_ID": "42"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python"
+      ]
+    }
+  }
+}

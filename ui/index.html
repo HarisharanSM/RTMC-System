@@ -45,7 +45,8 @@ button{background:#22344b;border:1px solid #527087;color:#fff;border-radius:6px;
   <div class="a3-control"><h2>A3 carrier yaw</h2><div class="a3-buttons">
    <button data-btn="A3-left" aria-label="Rotate A3 clockwise; hold to move">ISO rotate left</button><button data-btn="A3-right" aria-label="Rotate A3 counterclockwise; hold to move">ISO rotate right</button>
   </div></div>
-  <button id="stop">Stop / acknowledge</button>
+  <button id="stop" disabled>Stop / acknowledge</button>
+  <div id="command-source" role="status">Waiting for command source.</div>
   <div id="reason">Loading model and controller state.</div>
   <small id="feedback">No complete drive feedback sample.</small>
  </aside>
@@ -100,7 +101,7 @@ function draw(){
  const heading=q[0]+q[1]+q[2];document.getElementById('position').textContent=`EOF X ${imaging[0].toFixed(3)} m · Y ${imaging[1].toFixed(3)} m · heading ${heading.toFixed(2)}° · pose ${driveState.pose_sequence}`;
 }
 function setControls(enabled){controls.forEach(b=>b.disabled=!enabled);}
-async function post(btn,cmd='',signal){const r=await fetch('/command?btn='+encodeURIComponent(btn)+'&cmd='+cmd,{method:'POST',signal});if(!r.ok)throw Error('Command rejected');return r.json();}
+async function post(btn,cmd='',signal){if(driveState?.command_source!=='browser')throw Error('Browser control is not selected');const r=await fetch('/command?btn='+encodeURIComponent(btn)+'&cmd='+cmd,{method:'POST',signal});if(!r.ok)throw Error('Command rejected');return r.json();}
 function stop(){active=null;++inputEpoch;if(holdAbort){holdAbort.abort();holdAbort=null;}post('none','stop',AbortSignal.timeout(500)).catch(()=>{});}
 async function start(event){
  event.preventDefault();if(active||event.currentTarget.disabled)return;
@@ -116,13 +117,16 @@ document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{con
 async function poll(){
  try{
   const r=await fetch('/state',{cache:'no-store',signal:AbortSignal.timeout(500)});if(!r.ok)throw Error();const s=await r.json();driveState=s;
-  const stale=!s.feedback_valid||s.pose_age_ms>300;setControls(!stale);
+  const browserControl=s.command_source==='browser';
+  const stale=!s.feedback_valid||s.pose_age_ms>300;setControls(!stale&&browserControl);
+  document.getElementById('stop').disabled=!browserControl;
+  document.getElementById('command-source').textContent=browserControl?'Control: browser joystick':'Control: ROS 2 · browser is a live monitor. Stop / acknowledge through ROS 2.';
   if(!stale&&s.pose_source==='drive_can_feedback'&&Array.isArray(s.axles_deg)&&s.axles_deg.length===5){lastPose=s.axles_deg.slice();lastPose.forEach((v,i)=>document.getElementById('a'+(i+1)).textContent=v.toFixed(2)+'°');}
   const stateNode=document.getElementById('state');stateNode.textContent='Collision supervision · '+s.state;stateNode.className='status '+(s.state.includes('Latched')?'latched':stale?'stale':'');
   document.getElementById('reason').textContent=s.reason+' · Clear permits: '+s.clear_permits;
   document.getElementById('feedback').textContent=stale?'Drive CAN feedback stale — Start inhibited':`Drive CAN feedback · sequence ${s.pose_sequence} · age ${s.pose_age_ms} ms`;
   if(stale&&active)stop();draw();
- }catch(e){setControls(false);document.getElementById('state').textContent='Disconnected · motion status unavailable';document.getElementById('state').className='status stale';if(active)stop();}
+ }catch(e){setControls(false);document.getElementById('stop').disabled=true;document.getElementById('state').textContent='Disconnected · motion status unavailable';document.getElementById('state').className='status stale';if(active)stop();}
  setTimeout(poll,100);
 }
 async function sha256(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return[...new Uint8Array(bytes)].map(v=>v.toString(16).padStart(2,'0')).join('');}

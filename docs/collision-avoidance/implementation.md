@@ -39,6 +39,17 @@ An unchanged-pose CAN heartbeat keeps feedback age meaningful while stationary.
 
 ## Implemented path
 
+The offline reference generator uses `math.fsum` for matrix/vector reductions
+and canonicalizes derived numbers to an absolute 1e-12 m/rad quantum before
+writing JSON, C++, viewer data and OBJ vertices. This removes Python-version
+and last-bit libm variation, including signed zero near cancellation. The C-arm
+sector boxes include a 1e-11 m serialization pad: center and size rounding
+contribute at most (sqrt(3)*0.5 + 0.25)e-12 m per side, and angle rounding moves points by less
+than 0.45e-12 m for the sub-0.9 m local radius. This pad preserves numeric
+enclosure only; it is not a physical uncertainty or safety margin. Parameter
+and generator hashes remain in the manifest, and `--check` still compares all
+generated files exactly.
+
 `cDrive::Initialize` constructs the compiled pheno-inspired/fixed-table reference scene and starts `cCollisionSupervisor`. Start now carries its real joystick direction from the HTTP/CAN mocker. `cDriveController` creates a session, holds zero speed, publishes a preflight request and waits without running geometry on the drive callback.
 
 The collision worker calculates a conservative travel distance covering the configured reaction interval and braking distance without accelerating beyond the enforced drive speed cap. It maps each predicted pose through the existing relative-A2 kinematics, transforms all link/C-arm box bodies, and checks robot/environment plus selected self-collision pairs. A separating-axis OBB test supplies exact pose overlap and a cheap separation bound; unresolved diagonal cases use exact box closest-feature distance. Adaptive interval subdivision certifies that distance exceeds the 10 mm residual gap plus an upper bound on body movement throughout the interval. A result that cannot be certified within bounded subdivision is `Unknown`, which has the same stop effect as `Hazard`.

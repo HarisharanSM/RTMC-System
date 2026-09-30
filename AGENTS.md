@@ -51,3 +51,31 @@ If CMake is unavailable, the test sources are listed in `CMakeLists.txt` and can
 - Changing frames or drive/avoidance behavior requires architecture sections
   17.5 and 18.12, including `tests/test_runtime.py` against the actual
   executable. A static viewer or library-only test is insufficient.
+
+## Optional ROS 2 integration
+
+- `ros2/` is a separate ROS 2 Jazzy workspace targeting Ubuntu 24.04 Codespaces;
+  the root CMake build remains ROS-independent. Read
+  `docs/ros2/interface-contract.md` before changing the adapter boundary.
+- `pcan_demo --command-source browser|ros2` selects the sole HTTP command source
+  at startup (browser by default). Wrong-source requests, including Stop, must
+  return 409 without changing CAN sequence/session state. `/state` reports the
+  selected source; the browser is a live monitor in ROS mode.
+- ROS command enablement is explicit. Forward each accepted Hold once; never
+  generate background holds, retry uncertain commands or automatically clear a
+  protective stop. Explicit Stop is required before rearming after failures.
+- JointState angles use radians; raw state retains named legacy units. Do not
+  publish stale poses with fresh timestamps or invent per-joint velocity data.
+- `scripts/setup_ros2_codespaces.sh` installs dependencies and
+  `scripts/verify_ros2_codespaces.sh` records verification phases. Tests own
+  port 8082; serialize actual-runtime checks. Keep unexecuted cloud checks and
+  existing regression failures visible in `docs/ros2/validation.md`.
+
+- The integrated `demo.launch.py` owns its simulator and exposes topics, service,
+  bounded `/rtmc/jog_for` action and URDF/TF. Action-generated Holds are finite
+  user-requested inputs, forwarded once through the same policy. Never clear a
+  failure latch from an action; confirm fresh Disarmed feedback after its Stop.
+- `rtmc_description` consumes real simulator JointState feedback only. Its
+  `imaging_center` frame is pre-A4/A5 tilt, while `c_arm` includes full tilt.
+  Validate URDF changes against C++ FK with `ros2_description_fk`; visual shapes
+  are schematic and do not replace generated collision bodies.

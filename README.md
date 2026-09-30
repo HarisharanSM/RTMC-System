@@ -8,7 +8,7 @@ RTMC-System is a C++17 simulator for a five-axis motion-control stack used in pr
 
 ```
 Browser dashboard (ui/index.html)
-        │  HTTP GET (button press)
+        │  ordered HTTP POST /command (start / hold / stop)
         ▼
 CANMocker  — HTTP-to-CAN bridge, listens on :8082
         │  builds a TPCANMsg frame, injects it into the bus
@@ -37,9 +37,10 @@ The system is built around motion and collision interfaces (`includes/iSystemCon
 | `includes/` | Shared interfaces (`iSystemController`, `iPCANController`, `iDrive`), simulated PCANBasic types (`PCANTypes.h`), and common data structures (`commonDrive.h`: `drivePosition`, `joystickSignal`, `AxelPostion`) |
 | `PCAN/` | Simulated CAN transport layer — `cPCANSender`/`cPCANReceiver` (stubbed I/O), `cPCANController` (bus orchestrator with a pub/sub subscription registry keyed by CAN message ID), `cCANDriveHandler` (decodes raw CAN frames into `joystickSignal`) |
 | `SystemController/` | `cControlManager` — the composition root; wires the CAN controller and drive together and routes `DRIVE_MSG`/`START_DRIVE_MSG`/`STOP_DRIVE_MSG` to the appropriate drive calls |
-| `CANMocker/` | `cCANMocker` — a minimal HTTP server (raw POSIX sockets, port 8082) that translates GET requests from the web UI into `TPCANMsg` CAN frames and injects them into the bus |
+| `CANMocker/` | `cCANMocker` — a loopback HTTP server (port 8082) that translates ordered POST requests from the selected browser or ROS 2 command source into `TPCANMsg` CAN frames |
 | `drive/` | Motion subsystem — `cDrive` (façade), `cDriveController` (stateful engine: e-stop, error handling, current position), `cDriveCalculator` (2-link planar-arm forward/inverse kinematics, reach and joint-limit gating, trapezoidal velocity profiling) — see [docs/kinematics-model.md](docs/kinematics-model.md) |
-| `ui/` | `index.html` — a self-contained dual-joystick dashboard (left pad: LAO/RAO & CRAN/CAUD, right pad: X/Y) that polls the CAN mocker over HTTP while a button is held |
+| `ui/` | `index.html` — integrated C-arm display with LAO/CRAN, X/Y and independent A3 jog controls; monitors CAN feedback through `/state` |
+| `ros2/` | Optional ROS 2 Jazzy workspace: joint telemetry, diagnostics, recording and guarded start/hold/stop service through the existing HTTP/CAN path |
 
 ## Building
 
@@ -88,10 +89,41 @@ does not embed a second viewer. The generated viewer file remains available for
 offline inspection. No separate Python server is needed.
 
 X/Y are fixed offsets from the initial patient-head position. A1/A2 retain the
-existing geometry; A3 automatically cancels their heading, A4 is LAO and A5 is
+existing geometry; A3 retains the selected world heading during X/Y, A4 is LAO and A5 is
 CRAN. The console shows all five drive-originated CAN feedback angles, feedback
 age and avoidance state. UI press/hold/release commands also enter through the
 versioned simulated CAN codec.
+
+## ROS 2 and GitHub Codespaces
+
+The optional [ROS 2 guide](docs/ros2/README.md) provides an Ubuntu 24.04 / Jazzy
+Codespace, a rerunnable dependency installer, launch and jogging examples,
+node/topic discovery, telemetry recording and replay. ROS packages are built
+separately with `colcon`; the C++ CMake build does not require ROS.
+
+The [integrated ROS demo](docs/ros2/integrated-demo.md) combines topics, the Jog
+service, a cancellable bounded jog action and a five-axis URDF/TF model. It runs
+headlessly with the browser monitor; RViz is an optional desktop view.
+
+```bash
+bash scripts/setup_ros2_codespaces.sh
+bash scripts/verify_ros2_codespaces.sh
+```
+
+The CMake project defaults to `RelWithDebInfo` for single-configuration builds
+when no build type is specified. Set `-DCMAKE_BUILD_TYPE=Debug` explicitly when
+you need a debug build; multi-configuration generators select the build type at
+build time.
+
+The simulator defaults to browser control. Use `--command-source ros2` for ROS
+control; the browser then becomes a live monitor. The bridge also requires
+explicit command enablement. Source selection prevents mixed input streams and
+does not authenticate clients. ROS requests still pass through the existing
+CAN decoder, collision preflight, drive owner and renewal watchdog.
+
+See the [interface contract](docs/ros2/interface-contract.md) and
+[verification and validation record](docs/ros2/validation.md) for units, timeout
+rules, acceptance coverage and checks that still need execution in Codespaces.
 
 ## Status
 

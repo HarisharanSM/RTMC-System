@@ -1,0 +1,12 @@
+string direction
+float64 duration_sec
+---
+bool completed
+bool motion_observed
+bool explicit_stop_required
+string message
+---
+float64 elapsed_sec
+string controller_state
+bool feedback_valid
+float64[5] axles_rad

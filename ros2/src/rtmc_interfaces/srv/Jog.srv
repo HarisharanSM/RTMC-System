@@ -1,0 +1,10 @@
+builtin_interfaces/Time stamp
+string client_id
+uint64 sequence
+string command
+string direction
+---
+bool accepted
+string message
+uint32 input_sequence
+uint32 session

@@ -568,6 +568,7 @@ Run the real `pcan_demo` through its HTTP/CAN/drive/worker path. Required eviden
 | LIVE-11 | Stop process, missing assets, occupied port, worker startup failure | Clean shutdown or explicit failed startup; no unsupervised application mode |
 | LIVE-12 | Regenerate and compare models; run concurrency checks | No drift in generated files; head/alignment tests and sanitizers pass |
 | LIVE-13 | CRAN past +16 degrees, Stop, fresh CAUD Start and hold through zero | Modeled standstill uses a bounded horizon; A5 crosses zero without false latch; any selected lower cap is enforced by drive |
+| LIVE-14 | Select browser versus optional ROS 2 command source | Wrong-source Start/Hold/Stop returns 409 without changing CAN input sequence or session; selected source moves through the actual runtime |
 
 Automated runtime acceptance is `tests/test_runtime.py --binary build/pcan_demo`,
 registered as CTest `runtime_avoidance` when Python 3 is available. It launches
@@ -956,12 +957,21 @@ Prior 15-check runtime success does not establish this revision's completion.
 | WF-15 | Model mismatch and startup faults | Motion inhibited with explicit reason; no disabled-avoidance runtime mode |
 | WF-16 | Build, regression and concurrency tests | Existing kinematics/collision/data tests plus new workflow tests pass; sanitizer evidence recorded |
 | WF-17 | CRAN, Stop, then CAUD reversal | Fresh session crosses the original A5 angle under a collision-certified and drive-enforced profile; maximum-speed fallback remains for unknown state |
+| WF-18 | Optional ROS 2 bridge enabled | Fresh coherent CAN telemetry maps to radians; stale/duplicate/wrong-owner commands are rejected; loss of input or bridge cannot renew motion; explicit Stop and fresh Start are required after faults |
 
 Record application revision, host/toolchain, CAN fault-injection traces,
 browser checks, pose freshness, stop latency and observed clearance in
 `verification.md`. Mark revision 3 implemented only after these software checks
 pass against the same executable and assets. Physical release evidence remains
 governed by G1–G5.
+
+The optional ROS 2 bridge uses the existing HTTP/CAN boundary with explicit
+startup source selection, not a second drive writer. It leaves protocol
+revision 4 and generated geometry unchanged. `tests/test_command_source.py`
+checks LIVE-14 on the actual executable without ROS. ROS policy tests and the
+Jazzy smoke test cover WF-18; their executed versus pending evidence is recorded
+in [the ROS validation report](../ros2/validation.md). Cloud timing is not a
+physical or hard-real-time qualification.
 
 ## 19. Revision 6: independent A3 jog
 

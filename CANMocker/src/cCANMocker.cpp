@@ -31,12 +31,15 @@ void WriteU32(BYTE* data, std::uint32_t value) {
     for(int i=0;i<4;++i)data[i]=static_cast<BYTE>((value>>(8*i))&0xffu);
 }
 }
-cCANMocker::cCANMocker(std::shared_ptr<iPCANController> controller, std::string root)
-    : m_PcanController(std::move(controller)), m_AssetRoot(std::move(root)) {}
+cCANMocker::cCANMocker(std::shared_ptr<iPCANController> controller, std::string root,
+                     std::string commandSource)
+    : m_PcanController(std::move(controller)), m_AssetRoot(std::move(root)),
+      m_CommandSource(std::move(commandSource)) {}
 cCANMocker::~cCANMocker() { Stop(); }
 bool cCANMocker::Start() {
     if(m_IsRunning) return true;
     if(!m_PcanController) return false;
+    if(m_CommandSource!="browser" && m_CommandSource!="ros2") return false;
     m_ServerFd=socket(AF_INET,SOCK_STREAM,0);
     if(m_ServerFd<0) return false;
     int enabled=1;
@@ -94,8 +97,20 @@ void cCANMocker::MockingLoop() {
             }
         }
         if(path=="/state" && method=="GET" && controller) {
-            Respond(client,200,"application/json",controller->TelemetryJson());
+            auto state=controller->TelemetryJson();
+            state.insert(state.size()-1,",\"command_source\":\""+m_CommandSource+"\"");
+            Respond(client,200,"application/json",state);
         } else if(path=="/command" && method=="POST" && controller) {
+            const auto source=args.find("source");
+            const auto requestedSource=source==args.end()?"browser":source->second;
+            // Arbitration is serialized with CAN session allocation in this
+            // HTTP owner. A rejected source cannot issue Stop or alter tokens.
+            if(requestedSource!=m_CommandSource) {
+                Respond(client,409,"application/json",
+                    "{\"accepted\":false,\"reason\":\"command source is not selected\"}");
+                close(client);
+                continue;
+            }
             TPCANMsg frame{}; frame.MSGTYPE=PCAN_MESSAGE_STANDARD; frame.LEN=8;
             const auto button=buttons.find(args["btn"]);
             bool valid=true;

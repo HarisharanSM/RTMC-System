@@ -110,21 +110,22 @@ axles actually hold **so that** reversing direction responds immediately.
 - **And** on every tick the stored position equals FK of the commanded angles
   within 1e-6 cm *(this diverged by up to 79.9 cm before the fix)*
 
-### KIN-22 — A diagonal command keeps its direction and does not creep
-- **Given** the arm at (75, 0) with "+X" and "+Y" held together
+### KIN-22 — A diagonal command reaches the Y envelope without changing direction
+- **Given** the arm at (25, 75) with "+X" and "+Y" held together
 - **When** 100 ticks are commanded, long past the point Y saturates
 - **Then** while both axes are free the move stays on the commanded 45° line
-- **And** Y saturates exactly at +25 cm
+- **And** Y saturates exactly at +100 cm before a reach or joint limit
 - **And** once Y saturates the move halts rather than sliding along the wall —
-  X is identical at tick 50 and tick 100
+  X and Y are identical at tick 50 and tick 100
 
 ### KIN-23 — The Y envelope limit is enforced exactly
 - **Given** the arm at (75, 0) with "+Y" held for 200 ticks
-- **Then** Y never exceeds +25 cm
+- **Then** Y reaches and holds exactly +100 cm
 - **And** X is untouched by pure-Y motion
 
 ### KIN-24 — A saturated axis does not drift over a long hold
-- **Given** the arm held against the +X limit, and against a saturated diagonal
+- **Given** the arm held against the +X limit, and a diagonal from (75, 0) pinned
+  at A1's +10° joint limit
 - **When** 20 000 further ticks are commanded on each (~17 minutes of held button)
 - **Then** the position is bit-identical to the moment it saturated
 - **And** all 40 000 soak poses stay valid and finite

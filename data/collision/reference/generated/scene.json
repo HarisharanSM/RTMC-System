@@ -48,7 +48,7 @@
       "center_m": [
         0.75,
         0,
-        0.09000000000000001
+        0.09
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -288,9 +288,9 @@
     },
     {
       "center_m": [
-        -0.14890753591066452,
+        -0.148907535911,
         0,
-        0.7486087359588319
+        0.748608735959
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -299,20 +299,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -1.7671458676442586,
+      "rotation_y_rad": -1.767145867644,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.42405278523976925,
+        -0.42405278524,
         0,
-        0.6346398420641901
+        0.634639842064
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -321,20 +321,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -2.1598449493429825,
+      "rotation_y_rad": -2.159844949343,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.6346398420641901,
+        -0.634639842064,
         0,
-        0.4240527852397694
+        0.42405278524
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -343,20 +343,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -2.552544031041707,
+      "rotation_y_rad": -2.552544031042,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.7486087359588319,
+        -0.748608735959,
         0,
-        0.14890753591066486
+        0.148907535911
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -365,20 +365,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -2.945243112740431,
+      "rotation_y_rad": -2.94524311274,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.7486087359588319,
+        -0.748608735959,
         0,
-        -0.14890753591066466
+        -0.148907535911
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -387,20 +387,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -3.3379421944391554,
+      "rotation_y_rad": -3.337942194439,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.6346398420641902,
+        -0.634639842064,
         0,
-        -0.42405278523976925
+        -0.42405278524
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -409,20 +409,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -3.730641276137879,
+      "rotation_y_rad": -3.730641276138,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.4240527852397694,
+        -0.42405278524,
         0,
-        -0.63463984206419
+        -0.634639842064
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -431,20 +431,20 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -4.123340357836604,
+      "rotation_y_rad": -4.123340357837,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
       "center_m": [
-        -0.14890753591066488,
+        -0.148907535911,
         0,
-        -0.7486087359588319
+        -0.748608735959
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",
@@ -453,13 +453,13 @@
       "mobility": "articulated",
       "rigid_body": "carm",
       "rotation_x_rad": 0.0,
-      "rotation_y_rad": -4.516039439535327,
+      "rotation_y_rad": -4.516039439535,
       "rotation_z_rad": 0.0,
       "shape": "box",
       "size_m": [
-        0.1534503037177387,
-        0.22,
-        0.3277517409870954
+        0.153450303728,
+        0.22000000001,
+        0.327751740997
       ]
     },
     {
@@ -576,7 +576,7 @@
       "center_m": [
         0.9,
         0,
-        0.9750000000000001
+        0.975
       ],
       "collision_enabled": true,
       "dimension_status": "synthetic_unmeasured",

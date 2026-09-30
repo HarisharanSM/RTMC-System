@@ -25,6 +25,21 @@ def completed_future(probe, future, label, timeout=8):
     return result
 
 
+def action_details(result, feedback, snapshot, log_path):
+    """Keep the controller and action reason in the native failure output."""
+    recent = feedback[-1] if feedback else None
+    try:
+        bridge_log = log_path.read_text(errors='replace').splitlines()[-30:]
+    except OSError as exc:
+        bridge_log = ['log unavailable: ' + str(exc)]
+    return ('status=%r completed=%r motion_observed=%r explicit_stop_required=%r '
+            'message=%r feedback_count=%d latest_feedback=%r simulator=%r log_tail=%r' %
+            (result.status, result.result.completed, result.result.motion_observed,
+             result.result.explicit_stop_required, result.result.message, len(feedback),
+             (None if recent is None else (recent.controller_state, recent.feedback_valid,
+                                           recent.elapsed_sec)), snapshot, bridge_log))
+
+
 def check_transform(probe, buffer):
     # These checks run at home or after Stop. Do not reuse queued moving poses
     # from before the check, even when TF can interpolate their timestamps.
@@ -136,8 +151,9 @@ def main():
 
         handle = goal()
         result = completed_future(probe, handle.get_result_async(), 'normal action completion')
-        assert result.status == GoalStatus.STATUS_SUCCEEDED and result.result.completed
-        assert result.result.motion_observed and not result.result.explicit_stop_required
+        details = action_details(result, feedback, state(), evidence / 'demo.log')
+        assert result.status == GoalStatus.STATUS_SUCCEEDED and result.result.completed, details
+        assert result.result.motion_observed and not result.result.explicit_stop_required, details
         assert state()['state'] == 'Disarmed' and state()['speed_dps'] == 0
         assert feedback and any(f.feedback_valid for f in feedback)
         report['stages'].append('action feedback and finite completion')

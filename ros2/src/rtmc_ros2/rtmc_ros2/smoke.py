@@ -297,9 +297,20 @@ def main():
         probe.states.clear()
         probe.joints.clear()
         probe.diagnostics.clear()
-        player, play_log = start_process(['ros2', 'bag', 'play', str(bag)], evidence / 'bag_play.log')
-        wait_for(lambda: (probe.spin(.1) or (probe.states and probe.joints and probe.diagnostics)),
-                 'telemetry-only rosbag replay', seconds=12)
+        # Allow DDS discovery before the first stored sample. A short bag can
+        # otherwise finish before this already-created probe matches rosbag.
+        player, play_log = start_process(['ros2', 'bag', 'play', str(bag),
+                                          '--delay', '3.0'], evidence / 'bag_play.log')
+        try:
+            wait_for(lambda: (probe.spin(.1) or
+                              (probe.states and probe.joints and probe.diagnostics)),
+                     'telemetry-only rosbag replay', seconds=12)
+        except AssertionError as exc:
+            counts = {'state': len(probe.states), 'joints': len(probe.joints),
+                      'diagnostics': len(probe.diagnostics)}
+            raise AssertionError('%s; received=%r; recorded=%r; player_exit=%r; '
+                'player_log=%s' % (exc, counts, report['bag_messages'], player.poll(),
+                                   evidence / 'bag_play.log')) from exc
         assert probe.states[0] in recorded['/rtmc/state'], 'replayed state differs from stored state'
         assert any(list(probe.joints[0].position) == list(msg.position)
                    for msg in recorded['/rtmc/joint_states']), 'replayed joints differ from stored joints'

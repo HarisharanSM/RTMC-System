@@ -58,6 +58,7 @@ class ActionRunnerTest(unittest.TestCase):
         outcome = self.step(runner, 1.16)
         self.assertFalse(outcome.completed)
         self.assertTrue(outcome.explicit_stop_required)
+        self.assertIn('policy requires explicit Stop', outcome.message)
         self.assertEqual(self.calls, ['stop', 'start'])
 
     def test_cancel_and_explicit_service_stop(self):
@@ -92,6 +93,7 @@ class ActionRunnerTest(unittest.TestCase):
         self.policy.observe(state('AvoidanceLatched'))
         outcome = self.step(runner, 1.05)
         self.assertTrue(outcome.explicit_stop_required)
+        self.assertIn('policy requires explicit Stop', outcome.message)
         self.assertEqual(self.calls, ['stop', 'start'])
 
     def test_uncertain_hold_and_stop_never_retry_or_acknowledge(self):
@@ -134,6 +136,7 @@ class ActionRunnerTest(unittest.TestCase):
                 outcome = self.step(runner, 1.05, cancel=True)
                 self.assertFalse(outcome.completed)
                 self.assertTrue(outcome.explicit_stop_required)
+                self.assertIn('explicit Stop required', outcome.message)
                 self.assertEqual(self.calls, ['stop', 'start'])
 
     def test_stop_confirmation_timeout_requires_explicit_stop(self):

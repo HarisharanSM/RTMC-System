@@ -64,15 +64,23 @@ class ActionJogRunner:
             message, cancelled)
         return self.outcome
 
-    def _healthy_owned(self, now_mono):
-        return (self.policy.action_owner is self.owner and
-                self.policy.connected and self.policy.feedback_fresh and
-                not self.policy.needs_stop and
-                self.policy.state.get('command_source') == 'ros2' and
-                self.policy.state.get('state') in ('Preflight', 'Running') and
-                self.policy.active is not None and
-                self.policy.active[:2] == (self.client_id, self.direction) and
-                now_mono - self.policy.active[2] <= .150)
+    def _unhealthy_reason(self, now_mono):
+        if not self.policy.connected:
+            return 'simulator disconnected'
+        if not self.policy.feedback_fresh:
+            return 'feedback invalid: ' + self.policy.feedback_reason
+        if self.policy.needs_stop:
+            return 'policy requires explicit Stop'
+        current = self.policy.state or {}
+        if current.get('command_source') != 'ros2':
+            return 'simulator command source changed'
+        if current.get('state') not in ('Preflight', 'Running'):
+            return 'controller lifecycle is ' + str(current.get('state'))
+        if self.policy.active is None or self.policy.active[:2] != (self.client_id, self.direction):
+            return 'action no longer owns active input'
+        if now_mono - self.policy.active[2] > .150:
+            return 'input renewal expired'
+        return None
 
     def step(self, *, now_mono=None, now_wall=None, cancel=False):
         if self.outcome is not None:
@@ -116,8 +124,9 @@ class ActionJogRunner:
             isinstance(current.get('axles_deg'), list) and
             len(current['axles_deg']) == 5 and
             any(abs(a - b) > 1e-5 for a, b in zip(current['axles_deg'], self.baseline_axes)))
-        if not self._healthy_owned(now_mono):
-            return self._finish(False, 'session unhealthy or input expired; explicit Stop required',
+        unhealthy_reason = self._unhealthy_reason(now_mono)
+        if unhealthy_reason is not None:
+            return self._finish(False, unhealthy_reason + '; explicit Stop required',
                                 stop_required=True)
         if cancel or now_mono - self.started >= self.duration:
             result = self._send('stop', now_mono, now_wall)

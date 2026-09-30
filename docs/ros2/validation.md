@@ -1,5 +1,36 @@
 # ROS 2 verification and validation
 
+## Latest Codespaces rerun and bounded smoke repair — 2026-09-30
+
+The user supplied a later verifier transcript for `20260930T132638Z-2108`.
+Its root CTest passed 8/8 suites, reference tests passed 14/14, ROS policy
+tests passed 25/25, and colcon reported 27 tests with zero failures. Native
+`ros-smoke` reached bag replay, then timed out waiting for all three telemetry
+topics. `integrated-demo` reached the normal action result, whose status and
+message were not printed by the failing assertion. Both native phases failed;
+this run does not establish native acceptance.
+
+The replay test launched `ros2 bag play` without a discovery interval. It now
+starts playback with a three-second delay, allowing the existing subscriber
+to match before the first stored sample. A timeout reports counts received
+per topic, counts decoded from the bag, the player exit status and its log
+path. This addresses a plausible discovery race; the supplied transcript
+does not prove that discovery was the only cause. The action assertion now
+reports the result status/message, recent feedback, simulator state and launch
+log tail. No action policy, renewal deadline or protective-stop behavior was
+changed because the transcript does not identify which condition aborted it.
+The action runner now names the failed health condition in its result message
+without changing the abort decision or issuing any additional command.
+
+Local macOS checks after this edit: all 25 ROS-free tests pass, and the
+ROS-free action runtime test passes against an actual `pcan_demo` executable,
+including normal completion, cancellation, service interruption and watchdog
+latch. Python syntax and `git diff --check` pass. Native ROS/Jazzy is unavailable on this host, so
+both repaired smoke phases require a fresh Codespaces verifier run. Preserve
+the new `smoke/bag_play.log`, `smoke/smoke_result.json`,
+`integrated-demo/demo.log` and `integrated-demo/demo_result.json` if either
+phase still fails.
+
 ## Codespaces evidence and repair — 2026-09-30
 
 The user supplied verifier output for `20260930T022905Z-4585`, using Ubuntu,

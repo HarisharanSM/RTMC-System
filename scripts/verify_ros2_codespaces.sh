@@ -106,7 +106,7 @@ done
 
 cmake_ok=false
 if command -v cmake >/dev/null; then
-  if run_step cmake-configure cmake -S "$repo" -B "$repo/build" &&
+  if run_step cmake-configure cmake -S "$repo" -B "$repo/build" -DCMAKE_BUILD_TYPE=RelWithDebInfo &&
      run_step cmake-build cmake --build "$repo/build" --parallel 2; then
     cmake_ok=true
   fi
@@ -165,6 +165,13 @@ if [[ $cmake_ok == true && $colcon_ok == true ]]; then
     run_step ros-smoke timeout --signal=INT --kill-after=10s 120s ros2 run rtmc_ros2 smoke \
       --binary "$repo/build/pcan_demo" --assets "$repo" \
       --evidence-dir "$evidence/smoke" || true
+    if port_is_free; then
+      run_step integrated-demo timeout --signal=INT --kill-after=10s 120s ros2 run rtmc_ros2 demo_smoke \
+        --binary "$repo/build/pcan_demo" --assets "$repo" \
+        --evidence-dir "$evidence/integrated-demo" || true
+    else
+      record_failure 'integrated-demo-port-8082-occupied'
+    fi
   elif [[ $overlay_ok == true ]]; then
     record_failure 'ros-smoke-port-8082-occupied'
   fi

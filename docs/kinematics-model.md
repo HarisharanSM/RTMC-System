@@ -131,6 +131,10 @@ joint rate**. It returns both the accepted pose and its axle solution, so the
 caller commits a pose that is guaranteed consistent with the angles being sent to
 the bus. `m_CurrentPosition` can no longer diverge from the physical arm.
 
+The declared Cartesian envelope is `X∈[0,150] cm`, `Y∈[-100,100] cm`. Reach
+and axle limits may stop a command before it reaches an envelope edge; the
+envelope itself does not guarantee that every point inside is reachable.
+
 ### S3 — Explicit joint limits
 
 Assumed machine limits, exposed as named constants for replacement with real
@@ -177,9 +181,9 @@ The distinction matters. The first implementation of this fix used `GEOM_EPS`
 for both, and the test suite caught the consequence: with an axis pinned at a
 limit, each tick found `GEOM_EPS` of headroom, the commit clamp snapped the
 pinned axis back onto the exact limit, and the *next* tick found the same
-headroom again. Holding a diagonal against the Y limit made X creep by exactly
-1e-6 cm per tick without bound. Slack may accept a pose; it must never authorise
-a step. `KIN-24` soaks 40 000 ticks against saturated limits as a regression
+headroom again. A free axis could creep by exactly 1e-6 cm per tick without
+bound. Slack may accept a pose; it must never authorise a step. `KIN-24` soaks
+40 000 ticks against the +X envelope and A1's +10° joint limit as a regression
 guard.
 
 ### S6 — Coordinated motion at a limit
@@ -188,8 +192,10 @@ When a multi-axis command drives one axis into a limit, the whole move stops
 rather than continuing along the remaining free axes. Direction is preserved, so
 the arm never silently changes the commanded heading to slide along a wall —
 more predictable behaviour for a positioner working near a patient. `KIN-22`
-pins this down. (The current UI cannot produce a multi-axis command anyway: the
-CAN mocker emits a one-hot button bitmask.)
+starts at (25,75) cm so the diagonal reaches Y=100 cm before a reach or joint
+limit. `KIN-24` separately soaks a diagonal from (75,0) cm that reaches A1's
++10° joint limit. (The current UI cannot produce a multi-axis command anyway:
+the CAN mocker emits a one-hot button bitmask.)
 
 ### S7 — Consequence worth knowing
 

@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.10)
 project(PCAN_Motion_Interface CXX)
 find_package(Threads REQUIRED)
 
+# Use an optimized build for verification unless a build type was requested.
+# Multi-config generators choose their configuration at build time.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -65,6 +71,14 @@ add_test(NAME collision_avoidance COMMAND collision_tests)
 # Runtime acceptance launches the real application and owns localhost:8082.
 find_program(RTMC_PYTHON_EXECUTABLE NAMES python3)
 if(RTMC_PYTHON_EXECUTABLE)
+    add_test(NAME ros2_description_fk COMMAND ${RTMC_PYTHON_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/ros2/src/rtmc_description/test/test_description_fk.py)
+    set_tests_properties(ros2_description_fk PROPERTIES TIMEOUT 30)
+    add_test(NAME ros2_policy COMMAND ${CMAKE_COMMAND} -E env
+        "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/ros2/src/rtmc_ros2"
+        ${RTMC_PYTHON_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/ros2/src/rtmc_ros2/test -p "test_*.py")
+    set_tests_properties(ros2_policy PROPERTIES TIMEOUT 15)
     add_test(NAME runtime_avoidance COMMAND ${RTMC_PYTHON_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_runtime.py --binary $<TARGET_FILE:pcan_demo>)
     set_tests_properties(runtime_avoidance PROPERTIES RUN_SERIAL TRUE TIMEOUT 40)
@@ -74,4 +88,7 @@ if(RTMC_PYTHON_EXECUTABLE)
     add_test(NAME ros2_adapter_runtime COMMAND ${RTMC_PYTHON_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ros2_adapter_runtime.py --binary $<TARGET_FILE:pcan_demo>)
     set_tests_properties(ros2_adapter_runtime PROPERTIES RUN_SERIAL TRUE TIMEOUT 15)
+    add_test(NAME ros2_action_runtime COMMAND ${RTMC_PYTHON_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ros2_action_runtime.py --binary $<TARGET_FILE:pcan_demo>)
+    set_tests_properties(ros2_action_runtime PROPERTIES RUN_SERIAL TRUE TIMEOUT 20)
 endif()

@@ -344,34 +344,38 @@ void UC4_NoDivergence() {
             Num(drift, 12) + " cm, versus 79.9 cm before the fix)");
     EndScenario();
 
-    Scenario("KIN-22", "A diagonal command keeps its direction and does not creep");
-    Given("the arm at (75, 0) with +X and +Y held together");
+    Scenario("KIN-22", "A diagonal command reaches the Y envelope without changing direction");
+    Given("the arm at (25, 75) with +X and +Y held together");
     When("100 ticks are commanded, long past the point Y saturates");
     cDriveCalculator diag;
-    const RunTrace run2 = Drive(diag, Pos(75, 0), Sig(1, 1, 0, 0), 100);
+    const RunTrace run2 = Drive(diag, Pos(25, 75), Sig(1, 1, 0, 0), 100);
     Then(run2.allPosesValid, "every committed pose is valid");
-    AndThen(Near(run2.poses[19].X - 75.0, run2.poses[19].Y, 1e-9),
+    AndThen(Near(run2.poses[19].X - 25.0, run2.poses[19].Y - 75.0, 1e-9),
             "while both axes are free the move stays on the commanded 45 degree line, "
-            "no radial retargeting (at tick 20: dX " + Num(run2.poses[19].X - 75.0, 9) +
-            ", dY " + Num(run2.poses[19].Y, 9) + ")");
+            "no radial retargeting (at tick 20: dX " + Num(run2.poses[19].X - 25.0, 9) +
+            ", dY " + Num(run2.poses[19].Y - 75.0, 9) + ")");
     AndThen(Near(run2.finalPos.Y, ENVELOPE_MAX_Y_CM, 1e-9),
-            "Y saturates exactly at its +25 cm limit (got " + Num(run2.finalPos.Y, 9) + ")");
+            "Y saturates exactly at its +" + Num(ENVELOPE_MAX_Y_CM, 3) +
+            " cm limit (got " + Num(run2.finalPos.Y, 9) + ")");
     // Coordinated motion: a limit on one axis halts the whole move rather than
     // silently turning it into a slide along the wall. Direction is preserved,
     // which for a positioner is more predictable than changing it mid-command.
-    AndThen(Near(run2.poses[99].X, run2.poses[49].X, 1e-12),
+    AndThen(Near(run2.poses[99].X, run2.poses[49].X, 1e-12) &&
+            Near(run2.poses[99].Y, run2.poses[49].Y, 1e-12),
             "once Y saturates the move halts instead of creeping along the wall "
-            "(X at tick 50 " + Num(run2.poses[49].X, 9) + " vs tick 100 " +
-            Num(run2.poses[99].X, 9) + ")");
+            "(tick 50 X/Y " + Num(run2.poses[49].X, 9) + "/" +
+            Num(run2.poses[49].Y, 9) + ", tick 100 " + Num(run2.poses[99].X, 9) +
+            "/" + Num(run2.poses[99].Y, 9) + ")");
     EndScenario();
 
     Scenario("KIN-24", "A saturated axis does not drift over a long hold");
-    Given("the arm held against the +X limit and against a saturated diagonal");
+    Given("the arm held against the +X limit and a diagonal pinned at A1's +10 degree joint limit");
     When("20000 further ticks are commanded (about 17 minutes of held button)");
     cDriveCalculator soakX;
     const RunTrace settleX = Drive(soakX, Pos(0, 0), Sig(1, 0, 0, 0), 400);
     const RunTrace soakedX = Drive(soakX, settleX.finalPos, Sig(1, 0, 0, 0), 20000);
     cDriveCalculator soakD;
+    // This separate diagonal fixture pins A1 at its +10 degree joint limit.
     const RunTrace settleD = Drive(soakD, Pos(75, 0), Sig(1, 1, 0, 0), 100);
     const RunTrace soakedD = Drive(soakD, settleD.finalPos, Sig(1, 1, 0, 0), 20000);
     Then(Near(soakedX.finalPos.X, settleX.finalPos.X, 1e-12),
@@ -381,6 +385,9 @@ void UC4_NoDivergence() {
             Near(soakedD.finalPos.Y, settleD.finalPos.Y, 1e-12),
             "the free axis of a saturated diagonal does not creep (X " +
             Num(soakedD.finalPos.X, 9) + ", Y " + Num(soakedD.finalPos.Y, 9) + ")");
+    AndThen(Near(settleD.finalAxel.A1, A1_MAX_DEG, 1e-9),
+            "the diagonal fixture is pinned at A1's +10 degree joint limit (got " +
+            Num(settleD.finalAxel.A1, 12) + " deg)");
     AndThen(soakedX.allPosesValid && soakedD.allPosesValid && !soakedX.sawNaN && !soakedD.sawNaN,
             "all 40000 soak poses stay valid and finite");
     EndScenario();
@@ -390,8 +397,9 @@ void UC4_NoDivergence() {
     When("200 ticks are commanded");
     cDriveCalculator vertical;
     const RunTrace run3 = Drive(vertical, Pos(75, 0), Sig(0, 1, 0, 0), 200);
-    Then(run3.finalPos.Y <= ENVELOPE_MAX_Y_CM + 1e-9,
-         "Y never exceeds +25 cm (got " + Num(run3.finalPos.Y, 9) + ")");
+    Then(Near(run3.finalPos.Y, ENVELOPE_MAX_Y_CM, 1e-9),
+         "Y reaches and holds the exact +" + Num(ENVELOPE_MAX_Y_CM, 3) +
+         " cm envelope limit (got " + Num(run3.finalPos.Y, 9) + ")");
     AndThen(Near(run3.finalPos.X, 75.0, 1e-9),
             "X is untouched by pure-Y motion (got " + Num(run3.finalPos.X, 9) + ")");
     EndScenario();

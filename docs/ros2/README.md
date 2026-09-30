@@ -15,9 +15,9 @@ environment is needed.
 | Scripted integration testing | A typed interface for another ROS process to request bounded jogging | Jog service with timestamps, sequence checks and explicit Stop acknowledgement |
 | Component discovery | ROS tools can discover and inspect the simulator adapter in the same Codespace | Node, topic and service discovery |
 
-The bridge wraps the current HTTP/CAN/drive path. Trajectory planning,
-`ros2_control`, URDF/TF, RViz, physical hardware and remote DDS networking are
-future use cases, not implemented features of this change.
+The bridge wraps the current HTTP/CAN/drive path. The [integrated demo](integrated-demo.md) adds a bounded jog action, URDF/TF
+and an optional RViz configuration. Trajectory planning, `ros2_control`, physical
+hardware and remote DDS networking remain future use cases.
 
 ## Start a Codespace
 
@@ -62,7 +62,7 @@ C++ drive authorized motion.
 From the repository root:
 
 ```bash
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build
 colcon --log-base "$HOME/.local/share/rtmc-ros2/log" build \
   --base-paths ros2/src \
@@ -162,7 +162,7 @@ Check `/rtmc/state`, `/rtmc/diagnostics`, and the simulator's `/state` to observ
 the result. The C++ 150 ms permission-renewal watchdog remains authoritative.
 
 Client sequence history is bounded to 32 unique IDs for one bridge lifetime.
-The example uses a new ID per invocation. If that limit is reached, stop the
+The service example uses a new ID per invocation; each accepted action also uses a new ID. If that limit is reached, stop the
 bridge, confirm the drive has stopped, then restart it and explicitly acknowledge
 before jogging. The bridge never evicts old sequence history to admit delayed
 requests. It rejects simulated-clock operation (`use_sim_time=true`); command

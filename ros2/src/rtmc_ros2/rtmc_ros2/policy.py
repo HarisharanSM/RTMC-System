@@ -69,6 +69,25 @@ class JogPolicy:
         self.feedback_fresh = False
         self.feedback_reason = 'no feedback observed'
         self.connected = False
+        self.action_owner = None
+
+    def reserve_action(self, owner, direction, *, enabled):
+        """Reserve the one command path before an action goal is accepted."""
+        self.expire()
+        if self.action_owner is not None or self.active is not None:
+            return False, 'another jog owns the command path'
+        if direction not in DIRECTIONS:
+            return False, 'unknown jog direction'
+        if not enabled or not self.connected or self.state.get('command_source') != 'ros2':
+            return False, 'ROS commands are unavailable'
+        if not self.feedback_fresh or self.needs_stop or self.state.get('state') != 'Disarmed':
+            return False, 'fresh Disarmed feedback and prior explicit Stop required'
+        self.action_owner = owner
+        return True, 'action reserved'
+
+    def release_action(self, owner):
+        if self.action_owner is owner:
+            self.action_owner = None
 
     def observe(self, state, elapsed_ms=0.0):
         was_connected = self.connected
@@ -103,7 +122,7 @@ class JogPolicy:
             self.needs_stop = True
 
     def request(self, client_id, sequence, stamp_seconds, command, direction,
-                dispatch, *, enabled, now_wall=None, now_mono=None):
+                dispatch, *, enabled, now_wall=None, now_mono=None, action_owner=None):
         now_wall = time.time() if now_wall is None else now_wall
         now_mono = time.monotonic() if now_mono is None else now_mono
         self.expire(now_mono)
@@ -132,6 +151,12 @@ class JogPolicy:
             return JogResult(False, 'simulator disconnected')
         if self.state.get('command_source') != 'ros2':
             return JogResult(False, 'simulator command_source is not ros2')
+        if command != 'stop' and self.action_owner is not None and action_owner is not self.action_owner:
+            return JogResult(False, 'bounded jog action owns the command path')
+        if command == 'stop' and action_owner is not self.action_owner:
+            # An explicit service Stop can always interrupt an action. The
+            # action must never emit another Hold or Stop after losing ownership.
+            self.action_owner = None
         if command != 'stop':
             if not self.feedback_fresh:
                 return JogResult(False, self.feedback_reason)

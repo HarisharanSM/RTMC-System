@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!-- Synthetic engineering visualization only; dimensions are provisional, not OEM CAD. -->
+<robot name="rtmc_simulation">
+  <material name="frame_gray"><color rgba="0.35 0.39 0.43 1"/></material>
+  <material name="arm_blue"><color rgba="0.12 0.34 0.62 1"/></material>
+  <material name="carm_orange"><color rgba="0.85 0.32 0.08 1"/></material>
+  <link name="rtmc_patient"/>
+  <!-- Revision-5 K-to-world registration (-1.15 m) plus drive base (-0.25 m). -->
+  <link name="column_base">
+    <visual><origin xyz="0 0 0.12"/><geometry><cylinder radius="0.22" length="0.24"/></geometry><material name="frame_gray"/></visual>
+  </link>
+  <joint name="world_to_column_base" type="fixed"><parent link="rtmc_patient"/><child link="column_base"/><origin xyz="-1.40 0 0"/></joint>
+  <link name="link1">
+    <visual><origin xyz="0.375 0 0"/><geometry><box size="0.75 0.12 0.12"/></geometry><material name="arm_blue"/></visual>
+  </link>
+  <joint name="A1" type="revolute"><parent link="column_base"/><child link="link1"/><origin xyz="0 0 0.10"/><axis xyz="0 0 1"/><limit lower="-3.141592654" upper="0.174532925" effort="1" velocity="1.047197551"/></joint>
+  <link name="link2">
+    <visual><origin xyz="0.5 0 0"/><geometry><box size="1.0 0.10 0.10"/></geometry><material name="arm_blue"/></visual>
+  </link>
+  <joint name="A2" type="revolute"><parent link="link1"/><child link="link2"/><origin xyz="0.75 0 0.18"/><axis xyz="0 0 1"/><limit lower="0" upper="3.141592654" effort="1" velocity="1.047197551"/></joint>
+  <link name="column"><visual><origin xyz="0 0 0"/><geometry><cylinder radius="0.12" length="0.18"/></geometry><material name="frame_gray"/></visual></link>
+  <joint name="link2_to_column" type="fixed"><parent link="link2"/><child link="column"/><origin xyz="1.0 0 0.09"/></joint>
+  <link name="a3_boom"/>
+  <joint name="column_to_a3_pivot" type="fixed"><parent link="column"/><child link="a3_boom"/><origin xyz="0 0 0.83"/></joint>
+  <link name="boom">
+    <visual><origin xyz="0.45 0 0"/><geometry><box size="0.90 0.16 0.16"/></geometry><material name="frame_gray"/></visual>
+  </link>
+  <joint name="A3" type="revolute"><parent link="a3_boom"/><child link="boom"/><axis xyz="0 0 1"/><limit lower="-3.141592654" upper="3.141592654" effort="1" velocity="0.174532925"/></joint>
+  <!-- Provisional 1.15 m remote-centre carrier locates the isocentre. -->
+  <link name="remote_center_mount"><visual><origin xyz="-0.575 0 0"/><geometry><box size="1.15 0.08 0.08"/></geometry><material name="frame_gray"/></visual></link>
+  <joint name="boom_to_a4_carrier" type="fixed"><parent link="boom"/><child link="remote_center_mount"/><origin xyz="1.15 0 0"/></joint>
+  <link name="imaging_center"/>
+  <joint name="mount_to_imaging_center" type="fixed"><parent link="remote_center_mount"/><child link="imaging_center"/></joint>
+  <link name="a4_carrier"/>
+  <joint name="A4" type="revolute"><parent link="imaging_center"/><child link="a4_carrier"/><axis xyz="1 0 0"/><limit lower="-3.141592654" upper="3.141592654" effort="1" velocity="1.047197551"/></joint>
+  <link name="a5_carrier"/>
+  <joint name="A5" type="revolute"><parent link="a4_carrier"/><child link="a5_carrier"/><axis xyz="0 1 0"/><limit lower="-1.570796327" upper="1.570796327" effort="1" velocity="1.047197551"/></joint>
+  <link name="c_arm">
+    <!-- Schematic C silhouette only; collision geometry remains in the reference model. -->
+    <visual><origin xyz="-0.50 0 0"/><geometry><box size="0.12 0.12 1.20"/></geometry><material name="carm_orange"/></visual>
+    <visual><origin xyz="-0.10 0 0.54"/><geometry><box size="0.80 0.12 0.12"/></geometry><material name="carm_orange"/></visual>
+    <visual><origin xyz="-0.10 0 -0.54"/><geometry><box size="0.80 0.12 0.12"/></geometry><material name="carm_orange"/></visual>
+  </link>
+  <joint name="a5_carrier_to_c_arm" type="fixed"><parent link="a5_carrier"/><child link="c_arm"/></joint>
+</robot>

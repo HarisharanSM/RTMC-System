@@ -101,10 +101,19 @@ Codespace, a rerunnable dependency installer, launch and jogging examples,
 node/topic discovery, telemetry recording and replay. ROS packages are built
 separately with `colcon`; the C++ CMake build does not require ROS.
 
+The [integrated ROS demo](docs/ros2/integrated-demo.md) combines topics, the Jog
+service, a cancellable bounded jog action and a five-axis URDF/TF model. It runs
+headlessly with the browser monitor; RViz is an optional desktop view.
+
 ```bash
 bash scripts/setup_ros2_codespaces.sh
 bash scripts/verify_ros2_codespaces.sh
 ```
+
+The CMake project defaults to `RelWithDebInfo` for single-configuration builds
+when no build type is specified. Set `-DCMAKE_BUILD_TYPE=Debug` explicitly when
+you need a debug build; multi-configuration generators select the build type at
+build time.
 
 The simulator defaults to browser control. Use `--command-source ros2` for ROS
 control; the browser then becomes a live monitor. The bridge also requires

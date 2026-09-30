@@ -70,3 +70,12 @@ If CMake is unavailable, the test sources are listed in `CMakeLists.txt` and can
   `scripts/verify_ros2_codespaces.sh` records verification phases. Tests own
   port 8082; serialize actual-runtime checks. Keep unexecuted cloud checks and
   existing regression failures visible in `docs/ros2/validation.md`.
+
+- The integrated `demo.launch.py` owns its simulator and exposes topics, service,
+  bounded `/rtmc/jog_for` action and URDF/TF. Action-generated Holds are finite
+  user-requested inputs, forwarded once through the same policy. Never clear a
+  failure latch from an action; confirm fresh Disarmed feedback after its Stop.
+- `rtmc_description` consumes real simulator JointState feedback only. Its
+  `imaging_center` frame is pre-A4/A5 tilt, while `c_arm` includes full tilt.
+  Validate URDF changes against C++ FK with `ros2_description_fk`; visual shapes
+  are schematic and do not replace generated collision bodies.

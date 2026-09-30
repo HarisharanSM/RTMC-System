@@ -71,6 +71,10 @@ apt_install \
   ros-jazzy-diagnostic-msgs \
   ros-jazzy-std-msgs \
   ros-jazzy-builtin-interfaces \
+  ros-jazzy-action-msgs \
+  ros-jazzy-robot-state-publisher \
+  ros-jazzy-tf2-ros \
+  ros-jazzy-tf2-msgs \
   ros-jazzy-ament-cmake \
   ros-jazzy-ament-cmake-python \
   ros-jazzy-launch-ros \

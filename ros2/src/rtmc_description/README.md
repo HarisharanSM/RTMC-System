@@ -1,0 +1,9 @@
+# RTMC simulation description
+
+This package publishes the five-axis simulation model with `robot_state_publisher`. Launch `ros2 launch rtmc_description description.launch.py` for headless TF publishing. The description consumes the adapter's `/rtmc/joint_states` directly; it does not create a joint-state publisher or command source. Set `use_rviz:=true` to start optional RViz.
+
+Stable TF links are `rtmc_patient`, `column_base`, `link1`, `link2`, `column`, `a3_boom`, `boom`, `remote_center_mount`, `imaging_center`, `a4_carrier`, `a5_carrier`, and `c_arm`. `imaging_center` is located at the isocentre before A4/A5 tilt; `c_arm` carries the full A1+A2+A3, A4, and A5 orientation. JointState names are the contract names `A1` through `A5` in radians. The fixed patient-to-base transform combines the revision-5 K-to-world registration (-1.15 m) with the drive base offset (-0.25 m). Planar links are 0.75 m and 1.00 m; A3 is independent and the carrier heading is A1+A2+A3. A provisional 1.15 m carrier places the isocentre, with A4 about local X and A5 about the resulting local Y.
+
+All visible geometry and the remote-centre carrier are synthetic engineering proxies with provisional dimensions. They are for simulation and visualization only, are not Siemens/OEM CAD, and do not represent released physical collision protection. Collision body transforms use the authoritative revision-5 `cBodyKinematics`; tests compare every corresponding frame and imaging-centre FK against those C++ sources.
+
+RViz is optional: install `ros-jazzy-rviz2` on a host with a display before enabling it. The C silhouette is schematic and does not replace the generated collision bodies. URDF effort values are placeholders required by the revolute-joint format, not actuator ratings. Stale TF can remain cached after feedback stops; consult `/rtmc/diagnostics` before treating a displayed pose as current.

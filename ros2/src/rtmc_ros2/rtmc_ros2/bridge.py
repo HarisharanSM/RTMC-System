@@ -6,6 +6,9 @@ import tempfile
 import time
 
 import rclpy
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.task import Future
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.clock import Clock, ClockType
@@ -14,7 +17,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from rtmc_interfaces.srv import Jog
+from rtmc_interfaces.action import JogFor
 
+from .action_runner import ActionJogRunner
 from .policy import JogPolicy, feedback_check
 from .transport import SimulatorClient
 
@@ -45,6 +50,15 @@ class Bridge(Node):
         self.joints_pub = self.create_publisher(JointState, '/rtmc/joint_states', 10)
         self.diagnostics_pub = self.create_publisher(DiagnosticArray, '/rtmc/diagnostics', 10)
         self.jog_service = self.create_service(Jog, '/rtmc/jog', self.on_jog)
+        self.action_runner = None
+        self.action_future = None
+        self.action_handle = None
+        self.action_futures = {}
+        self.jog_action = ActionServer(self, JogFor, '/rtmc/jog_for',
+            self.execute_jog_for, goal_callback=self.on_action_goal,
+            cancel_callback=self.on_action_cancel,
+            handle_accepted_callback=self.on_action_accepted,
+            callback_group=ReentrantCallbackGroup())
         self.poll_timer = self.create_timer(.05, self.poll, clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def validate_parameters(self, parameters):
@@ -83,6 +97,64 @@ class Bridge(Node):
                 msg.name = ['A1', 'A2', 'A3', 'A4', 'A5']
                 msg.position = axes
                 self.joints_pub.publish(msg)
+        if self.action_runner is not None and self.action_handle is not None:
+            now = time.monotonic()
+            outcome = self.action_runner.step(now_mono=now,
+                cancel=self.action_handle is not None and self.action_handle.is_cancel_requested)
+            valid, _, axes = feedback_check(self.policy.state,
+                (now - self.observed_mono) * 1000 if self.observed_mono else float('inf'))
+            feedback = JogFor.Feedback()
+            feedback.elapsed_sec = max(0.0, now - (self.action_runner.started or now))
+            feedback.controller_state = str((self.policy.state or {}).get('state', 'unknown'))
+            feedback.feedback_valid = valid
+            feedback.axles_rad = axes if valid else [0.0] * 5
+            self.action_handle.publish_feedback(feedback)
+            if outcome is not None and self.action_future is not None:
+                result = JogFor.Result()
+                result.completed = outcome.completed
+                result.motion_observed = outcome.motion_observed
+                result.explicit_stop_required = outcome.explicit_stop_required
+                result.message = outcome.message
+                if outcome.cancelled:
+                    self.action_handle.canceled()
+                elif outcome.completed:
+                    self.action_handle.succeed()
+                else:
+                    self.action_handle.abort()
+                self.action_future.set_result(result)
+                self.action_runner = None
+                self.action_future = None
+                self.action_handle = None
+
+    def on_action_goal(self, goal):
+        if self.action_runner is not None:
+            return GoalResponse.REJECT
+        self.refresh()
+        try:
+            self.action_runner = ActionJogRunner(self.policy, goal.direction,
+                goal.duration_sec, self.client.dispatch,
+                enabled=self.enabled and not self.get_parameter('use_sim_time').value)
+        except ValueError as exc:
+            self.get_logger().warn('JogFor goal rejected: ' + str(exc))
+            return GoalResponse.REJECT
+        self.action_future = Future()
+        return GoalResponse.ACCEPT
+
+    def on_action_cancel(self, goal_handle):
+        return CancelResponse.ACCEPT if goal_handle is self.action_handle else CancelResponse.REJECT
+
+    def on_action_accepted(self, goal_handle):
+        self.action_handle = goal_handle
+        self.action_futures[bytes(goal_handle.goal_id.uuid)] = self.action_future
+        goal_handle.execute()
+
+    async def execute_jog_for(self, goal_handle):
+        key = bytes(goal_handle.goal_id.uuid)
+        future = self.action_futures[key]
+        try:
+            return await future
+        finally:
+            self.action_futures.pop(key, None)
 
     def publish_diagnostics(self):
         current = self.policy.state or {}
@@ -130,6 +202,7 @@ class Bridge(Node):
         return response
 
     def destroy_node(self):
+        self.jog_action.destroy()
         fcntl.flock(self.lock, fcntl.LOCK_UN)
         self.lock.close()
         return super().destroy_node()

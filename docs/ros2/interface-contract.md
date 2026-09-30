@@ -1,4 +1,4 @@
-# ROS 2 integration contract (revision 1)
+# ROS 2 integration contract (revision 2)
 
 This optional adapter exposes the existing C++ simulator to ROS 2 Jazzy on
 Ubuntu 24.04. It does not provide physical encoder feedback or physical collision
@@ -42,6 +42,15 @@ The workspace is `ros2/`, with packages under `ros2/src/`:
 - `/rtmc/diagnostics`: `diagnostic_msgs/msg/DiagnosticArray`, connection,
   feedback freshness, lifecycle and protective-stop reason.
 - `/rtmc/jog`: `rtmc_interfaces/srv/Jog` (volatile service requests).
+- `/rtmc/jog_for`: `rtmc_interfaces/action/JogFor`, a finite jog with direction
+  and duration, progress feedback and cancellation. See the action rules below.
+- `rtmc_description`: synthetic URDF and headless `robot_state_publisher` launch,
+  consuming `/rtmc/joint_states`; `/robot_description`, `/tf` and `/tf_static`
+  expose the model. No substitute joint-state source is launched.
+- TF root `rtmc_patient` is the collision model's world frame. `imaging_center`
+  carries the pre-tilt A1+A2+A3 heading; `c_arm` includes A4 and A5 tilt. Meters
+  and radians are used throughout the URDF. Visual shapes are schematic proxies,
+  not collision bodies or physical calibration.
 
 ## Bridge policy
 
@@ -74,6 +83,37 @@ loss of input leaves the existing C++ 150 ms renewal watchdog to stop motion.
 The bridge also expires its local active input after 150 ms, refusing late
 Holds until explicit Stop and fresh Start. Network/cloud scheduling may cause
 nuisance stops; these are simulation checks, not hard real-time guarantees.
+
+## Bounded action ownership
+
+`JogFor` takes `string direction` and `float64 duration_sec` (0.1 through 5.0
+seconds). Feedback contains elapsed seconds, controller lifecycle, feedback
+validity and five joint angles in radians. Result fields are `completed`,
+`motion_observed`, `explicit_stop_required` and `message`. Completion describes
+a bounded jog interval, not achievement of a target position or guaranteed
+travel. Motion observation must come from actual feedback.
+
+An action goal never acknowledges startup or a protective latch. An explicit
+service Stop and fresh Disarmed feedback are prerequisites. Only one goal can
+reserve motion ownership. Competing goals and service Start/Hold requests are
+rejected; explicit service Stop remains available and terminates action
+ownership. No subsequent callback from that action may send Hold or Stop.
+
+The action is an opt-in finite command producer inside the bridge's single
+executor. It produces at most one input per timer tick through the same policy
+and transport as service requests. It does not make the bridge a perpetual
+Hold source, catch up missed ticks in a burst, or retry uncertain commands.
+Healthy completion/cancellation stops only its still-owned session. Failure,
+expiry, stale feedback, disconnection or an uncertain command ends input and
+reports acknowledgement required without issuing Stop. The C++ watchdog
+remains authoritative. Cancellation racing a failure cannot clear a latch.
+
+The `jog_for` example does not send the initial acknowledgement. Use the existing
+`jog --stop` deliberately before starting the action. `--cancel-after` demonstrates
+an explicit cancellation request. Losing an action client does not cancel an
+accepted finite goal: it can run until its bounded duration unless explicitly
+cancelled. Losing the bridge ends generated input and invokes the existing
+watchdog.
 
 ## Verification boundary
 

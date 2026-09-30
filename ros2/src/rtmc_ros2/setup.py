@@ -8,7 +8,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/bridge.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/bridge.launch.py', 'launch/demo.launch.py']),
     ],
     install_requires=['setuptools'],
     tests_require=['pytest'],
@@ -20,6 +20,8 @@ setup(
     entry_points={'console_scripts': [
         'bridge = rtmc_ros2.bridge:main',
         'jog = rtmc_ros2.jog:main',
+        'jog_for = rtmc_ros2.jog_for:main',
         'smoke = rtmc_ros2.smoke:main',
+        'demo_smoke = rtmc_ros2.demo_smoke:main',
     ]},
 )

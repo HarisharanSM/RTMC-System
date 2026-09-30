@@ -1,6 +1,55 @@
 # ROS 2 verification and validation
 
-## Current result — 2026-09-30
+## Codespaces evidence and repair — 2026-09-30
+
+The user supplied verifier output for `20260930T022905Z-4585`, using Ubuntu,
+GNU 13.3 and Python 3.12.3. It establishes these **pre-repair cloud results**:
+
+- Root CTest: 8/8 suites passed (12.80 seconds).
+- All three ROS packages built; colcon reported 23 tests, zero failures/errors.
+- Reference generation and reference tests failed on last-digit numeric differences.
+- Native service smoke reached telemetry discovery but failed the diagnostics
+  level assertion. Jazzy represents `DiagnosticStatus.level` as an octet; the
+  test incorrectly compared it with integer zero.
+- The integrated demo reached joint telemetry but timed out waiting for TF at a
+  fixed early timestamp. A sample predating the listener's usable history can
+  never become available. This startup race is a plausible cause; the pasted
+  output does not contain the publisher log/frame graph needed to exclude a
+  separate TF publisher issue. Action completion/cancellation was not reached.
+
+The pasted output does not include a source revision. Its cloud build pass
+must not be attributed to the subsequently repaired revision. The original
+installer/idempotency, full native smoke, replay and RViz gates remain separate.
+
+The repair uses 12-decimal absolute serialization and `math.fsum`, normalizes
+signed zero and regenerates artifacts through the generator. A documented
+1e-11 m outward sector-size pad covers serialization error; it does not change
+motion limits or replace physical calibration. Exact output/hash checks remain.
+The smoke repair uses the ROS diagnostic constant and bounded healthy-data
+readiness, and selects a recent joint sample whose TF is available at that same
+timestamp. Missing TF still fails with lookup/frame details; no position
+comparison tolerance, controller deadline or protective-stop rule is relaxed.
+
+Post-repair local validation: all 8 CTest suites passed (13.70 seconds), including
+the actual simulator runtime gates. After tightening TF selection to require a
+sample published after the check starts, the affected CTest was rerun and all
+25 ROS-free policy/action/smoke tests passed under Python 3.9 and 3.12. The
+exact generator check passes under both Python versions; all 14 reference tests
+pass, including all-output sine/cosine perturbations and analytic enclosure.
+Smoke Python syntax and `git diff --check` also pass. Both Python versions were
+run on macOS, so this is not an executed Linux portability qualification.
+
+The repair used Luna medium for reference generation and Sol medium for smoke
+checks, with primary review and final integration. No model escalation was used;
+per-agent token and cost totals are unavailable.
+
+Post-repair native ROS and Codespaces reruns remain **pending**. Local regression
+results below do not establish native DDS/TF/action success. Local repair evidence
+is stored under `verification-results/ros2-cloud-repair-20260930/`, including the
+user-provided pre-repair log. The repaired source starts from
+`788d7f61fc3fd230efcde0427a8fd1560daa91e1` plus the uncommitted repair.
+
+## Earlier local integrated-demo result — 2026-09-30
 
 The integrated demo passes **8/8 local CTest suites** in 13.96 seconds, including
 21 policy/action tests, URDF-to-C++ transform comparison and action execution
@@ -78,7 +127,7 @@ percentages are not task token measurements.
 | --- | --- | --- | --- |
 | ROS-V01 | Simulator still builds without ROS | Root CMake configure/build | PASS locally |
 | ROS-V02 | Preserve existing kinematics, collision and actual runtime gates | CTest `kinematics`, `collision_avoidance`, `runtime_avoidance` | PASS locally after fixture correction |
-| ROS-V03 | Preserve generated geometry and provenance | Generator `--check` (18 files), reference tests (12 tests) | PASS |
+| ROS-V03 | Preserve generated geometry and provenance | Exact generator/hash checks; numeric portability regressions | Cloud baseline FAIL; repaired local checks PASS; cloud rerun pending |
 | ROS-V04 | Wrong-source Start/Hold/Stop cannot change input sequence or session | CTest `command_source`, both modes and actual CAN-derived motion | PASS |
 | ROS-V05 | Timestamp, sequence, client/direction ownership and enablement checks | 12 pure-Python policy/transport tests | PASS |
 | ROS-V06 | Invalid/stale pose, counter regression and disconnection require acknowledgement | Policy tests, CTest `ros2_adapter_runtime` | PASS at policy/HTTP boundary |
@@ -87,15 +136,15 @@ percentages are not task token measurements.
 | ROS-V09 | Installer fails before mutation on unsupported host | Bash syntax and actual macOS rejection (`missing /etc/os-release`) | PASS for guard only |
 | ROS-V10 | Valid Python/package metadata and devcontainer configuration | Python syntax, package XML build types/license, JSON parsing, `git diff --check` | PASS; not a ROS build |
 | ROS-V11 | Fresh Ubuntu installation and installer rerun both succeed | `setup_ros2_codespaces.sh` in a new Codespace, then rerun | NOT EXECUTED |
-| ROS-V12 | ROS interfaces generate and Python package builds/tests through colcon | Verifier `colcon-build`, `colcon-test`, `colcon-results` | NOT EXECUTED |
-| ROS-V13 | Real DDS discovery, service dispatch and radians agree with simulator | Native `rtmc_ros2 smoke` | NOT EXECUTED |
+| ROS-V12 | ROS interfaces generate and Python package builds/tests through colcon | User cloud verifier: 3 packages, 23 tests, zero errors/failures | PASS for pre-repair cloud run; repaired version pending |
+| ROS-V13 | Real DDS discovery, service dispatch and radians agree with simulator | Native `rtmc_ros2 smoke` | Cloud FAIL at diagnostics assertion; repair rerun pending |
 | ROS-V14 | Moving bridge termination stops drive; restart cannot rearm; simulator reconnect requires Stop | Native smoke failure stages | NOT EXECUTED |
 | ROS-V15 | Record/decode/replay telemetry and compare stored values, with control offline | Native smoke SQLite3 bag stages | NOT EXECUTED |
 | ROS-V16 | Browser displays matching motion through Codespaces forwarding | Manual procedure below | NOT EXECUTED |
 | ROS-V18 | URDF agrees with C++ drive and eight collision frames | CTest `ros2_description_fk`, five poses | PASS locally |
 | ROS-V19 | Finite action, ownership, failure and cancellation policy | CTest `ros2_policy`, 21 combined policy/action tests | PASS locally |
 | ROS-V20 | Action producer moves/stops actual simulator and preserves watchdog latch | CTest `ros2_action_runtime` | PASS at policy/HTTP boundary |
-| ROS-V21 | Native actions, integrated launch, timestamped TF and service interruption | `demo_smoke`, verifier `integrated-demo` phase | NOT EXECUTED |
+| ROS-V21 | Native actions, integrated launch, timestamped TF and service interruption | `demo_smoke`, verifier `integrated-demo` phase | Cloud FAIL at TF wait before action checks; repair rerun pending |
 | ROS-V22 | RViz model displays correctly | Optional `use_rviz:=true` desktop launch | NOT EXECUTED |
 | ROS-V17 | Independent review of command/expiry/concurrency behavior | Planned separate reviewer | NOT EXECUTED: agent usage limit reached |
 

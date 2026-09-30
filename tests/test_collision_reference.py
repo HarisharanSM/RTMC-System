@@ -112,6 +112,45 @@ class ReferenceDataTests(unittest.TestCase):
                 local = ref.transform(ref.rotation("y", theta), centered)
                 self.assertTrue(all(abs(v) <= size/2+1e-12 for v,size in zip(local,b["size_m"])))
 
+    def test_numeric_serialization_is_stable_and_keeps_arc_enclosure(self):
+        # Near-zero cancellation is canonicalized with an absolute quantum and
+        # must not retain the sign bit of rounded zero.
+        self.assertEqual(ref.canonical_number(1e-16), 0.0)
+        self.assertEqual(math.copysign(1, ref.canonical_number(-1e-16)), 1.0)
+
+        # Exercise every output path with libm results perturbed by one ULP.
+        baseline = ref.outputs(self.p)
+        original_sin, original_cos = ref.math.sin, ref.math.cos
+        try:
+            for direction in (math.inf, -math.inf):
+                ref.math.sin = lambda x, f=original_sin, d=direction: math.nextafter(f(x), d)
+                ref.math.cos = lambda x, f=original_cos, d=direction: math.nextafter(f(x), d)
+                self.assertEqual(ref.outputs(self.p), baseline)
+        finally:
+            ref.math.sin, ref.math.cos = original_sin, original_cos
+
+        # Check the canonicalized scene used by outputs, so the rounding policy
+        # cannot shave the analytic annular arc outside its generated boxes.
+        scene = json.loads(ref.json_text(ref.canonicalize(ref.build_scene(self.p))))
+        r = self.p["robot"]
+        arc = [b for b in scene["bodies"] if b["id"].startswith("carm_sector_")]
+        h = math.radians(r["carm_arc_end_deg"]-r["carm_arc_start_deg"]) / (2*len(arc))
+        for index, b in enumerate(arc):
+            theta = -b["rotation_y_rad"]
+            original_theta = math.radians(r["carm_arc_start_deg"]) + (2*index+1)*h
+            for fraction, radius, depth in itertools.product([i/100 for i in range(101)],
+                    [r["carm_inner_radius_m"], r["carm_outer_radius_m"]], [-1, 1]):
+                angle = original_theta-h+2*h*fraction
+                point = [radius*math.cos(angle), depth*r["carm_depth_y_m"]/2, radius*math.sin(angle)]
+                centered = [v-c for v,c in zip(point, b["center_m"])]
+                local = ref.transform(ref.rotation("y", theta), centered)
+                self.assertTrue(all(abs(v) <= size/2+2e-15 for v,size in zip(local,b["size_m"])))
+
+    def test_parameter_changes_still_change_generated_outputs(self):
+        changed = json.loads(json.dumps(self.p))
+        changed["kinematics"]["link1_m"] += 0.001
+        self.assertNotEqual(ref.outputs(changed), ref.outputs(self.p))
+
     def test_generated_outputs_and_manifest(self):
         for name, expected in ref.outputs(self.p).items():
             self.assertEqual((ref.OUTPUT / name).read_text(), expected, name)

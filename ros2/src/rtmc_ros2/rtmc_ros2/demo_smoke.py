@@ -15,6 +15,7 @@ from rtmc_interfaces.action import JogFor
 from tf2_ros import Buffer, TransformListener
 
 from .smoke import Probe, port_free, start_process, state, stop_process, wait_for
+from .smoke_checks import joint_stamp_ns, select_transform_sample
 
 
 def completed_future(probe, future, label, timeout=8):
@@ -25,11 +26,35 @@ def completed_future(probe, future, label, timeout=8):
 
 
 def check_transform(probe, buffer):
-    probe.spin(.2)
-    sample = probe.joints[-1]
+    # These checks run at home or after Stop. Do not reuse queued moving poses
+    # from before the check, even when TF can interpolate their timestamps.
+    started_ns = time.time_ns()
+
+    def matching_sample():
+        probe.spin(.02)
+        return select_transform_sample(probe.joints,
+            lambda candidate: buffer.can_transform('rtmc_patient', 'imaging_center',
+                Time.from_msg(candidate.header.stamp)), min_stamp_ns=started_ns)
+
+    try:
+        sample = wait_for(matching_sample, 'TF at fresh joint feedback timestamp')
+    except AssertionError as exc:
+        latest = probe.joints[-1] if probe.joints else None
+        age_ms = ((time.time_ns() - joint_stamp_ns(latest)) / 1e6
+                  if latest is not None and joint_stamp_ns(latest) is not None else None)
+        try:
+            buffer.lookup_transform('rtmc_patient', 'imaging_center',
+                Time.from_msg(latest.header.stamp) if latest is not None else Time())
+            tf_error = 'latest lookup unexpectedly available'
+        except Exception as lookup_error:
+            tf_error = str(lookup_error)
+        try:
+            frames = buffer.all_frames_as_string()
+        except Exception as graph_error:
+            frames = 'frame graph unavailable: ' + str(graph_error)
+        raise AssertionError('%s; joint samples=%s latest_age_ms=%r; TF error=%s; frames=%s' %
+            (exc, len(probe.joints), age_ms, tf_error, frames)) from exc
     instant = Time.from_msg(sample.header.stamp)
-    wait_for(lambda: (probe.spin(.02) or buffer.can_transform(
-        'rtmc_patient', 'imaging_center', instant)), 'TF at joint feedback timestamp')
     transform = buffer.lookup_transform('rtmc_patient', 'imaging_center', instant).transform
     a1, a2, a3, _, _ = sample.position
     heading = a1 + a2 + a3

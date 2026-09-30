@@ -15,11 +15,13 @@ import urllib.error
 import urllib.request
 
 import rclpy
-from diagnostic_msgs.msg import DiagnosticArray
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from rtmc_interfaces.srv import Jog
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from rclpy.serialization import deserialize_message
+
+from .smoke_checks import diagnostic_details, healthy_diagnostic
 
 
 URL = 'http://127.0.0.1:8082'
@@ -195,7 +197,13 @@ def main():
         assert all(abs(a - math.radians(b)) < 1e-10
                    for a, b in zip(probe.joints[-1].position, state()['axles_deg']))
         assert probe.states[-1].get('simulation_only') is True
-        assert probe.diagnostics[-1].status[0].level == 0
+        try:
+            wait_for(lambda: (probe.spin(.05) or healthy_diagnostic(
+                probe.diagnostics[-1] if probe.diagnostics else None, DiagnosticStatus.OK)),
+                'fresh healthy bridge diagnostics', process=bridge)
+        except AssertionError as exc:
+            detail = diagnostic_details(probe.diagnostics[-1] if probe.diagnostics else None)
+            raise AssertionError(str(exc) + '; latest ' + detail) from exc
         report['stages'].append('service and telemetry discovery; five axes in radians')
 
         recorder, record_log = start_process([

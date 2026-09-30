@@ -16,13 +16,50 @@ ROOT = Path(__file__).resolve().parents[1]
 PARAMETERS = ROOT / "data/collision/reference/parameters.json"
 OUTPUT = ROOT / "data/collision/reference/generated"
 
+# Python 3.12 changed sum() for floats to use a more accurate algorithm, and
+# platform libm implementations can differ in the last few bits of sin/cos.
+# Use an explicit accurate reduction and canonicalize derived values at the
+# serialization boundary so checked-in artifacts do not depend on either.
+# A fixed absolute quantum avoids relative-precision surprises near zero.
+SERIALIZED_DECIMAL_PLACES = 12
+# The largest local radius of a sector box is below 0.9 m. Rounding its center
+# and size loses at most (sqrt(3)*0.5 + 0.25)e-12 m per side. Rounding its angle
+# by at most 0.5e-12 rad moves a point by less than 0.45e-12 m. The 5e-12 m half-size pad
+# exceeds their combined 1.57e-12 m bound, with room for arithmetic rounding.
+SECTOR_SERIALIZATION_PAD_M = 1e-11
+
+
+def stable_sum(values):
+    """Accurately and consistently reduce the small float vectors here."""
+    return math.fsum(values)
+
+
+def canonical_number(value):
+    """Canonical finite float precision: 1e-12 absolute, with signed zero removed."""
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError("generated reference contains a non-finite number")
+    rounded = float(format(value, ".%df" % SERIALIZED_DECIMAL_PLACES))
+    return 0.0 if rounded == 0.0 else rounded
+
+
+def canonicalize(value):
+    """Copy JSON-shaped data while canonicalizing every numeric leaf."""
+    if isinstance(value, float):
+        return canonical_number(value)
+    if isinstance(value, list):
+        return [canonicalize(item) for item in value]
+    if isinstance(value, dict):
+        return {key: canonicalize(item) for key, item in value.items()}
+    return value
+
 
 def identity():
     return [[float(i == j) for j in range(4)] for i in range(4)]
 
 
 def multiply(a, b):
-    return [[sum(a[i][k] * b[k][j] for k in range(4))
+    return [[stable_sum(a[i][k] * b[k][j] for k in range(4))
              for j in range(4)] for i in range(4)]
 
 
@@ -42,7 +79,7 @@ def rotation(axis, angle):
 
 
 def transform(t, p):
-    return [sum(t[i][j] * p[j] for j in range(3)) + t[i][3]
+    return [stable_sum([*(t[i][j] * p[j] for j in range(3)), t[i][3]])
             for i in range(3)]
 
 
@@ -135,7 +172,9 @@ def build_scene(p):
     for i in range(r["carm_segments"]):
         theta = start + (2 * i + 1) * half
         box("carm_sector_%02d" % i, "carm", "carm",
-            [hi - lo, r["carm_depth_y_m"], 2 * outer * math.sin(half)],
+            [hi - lo + SECTOR_SERIALIZATION_PAD_M,
+             r["carm_depth_y_m"] + SECTOR_SERIALIZATION_PAD_M,
+             2 * outer * math.sin(half) + SECTOR_SERIALIZATION_PAD_M],
             [radial_center * math.cos(theta), 0, radial_center * math.sin(theta)],
             ry=-theta)
     box("detector_housing", "carm", "carm", r["detector_size_m"], r["detector_center_m"])
@@ -204,7 +243,7 @@ def obj_text(bodies, transforms=None):
         points = body_vertices(body)
         if transforms is not None:
             points = [transform(transforms[body["frame"]], v) for v in points]
-        lines.extend("v %.10f %.10f %.10f" % tuple(v) for v in points)
+        lines.extend("v %.10f %.10f %.10f" % tuple(canonical_number(x) for x in v) for v in points)
         lines.extend("f %d %d %d" % tuple(offset + i for i in tri) for tri in TRIANGLES)
         offset += 8
     return "\n".join(lines) + "\n"
@@ -237,12 +276,12 @@ def cpp_scene_text(scene):
 
 
 def outputs(p):
-    scene = build_scene(p)
+    scene = canonicalize(build_scene(p))
     files = {"scene.json": json_text(scene), "scene_data.inc": cpp_scene_text(scene)}
     for frame in scene["frames"]:
         files["frames/" + frame + ".obj"] = obj_text([b for b in scene["bodies"] if b["frame"] == frame])
     for name, q in p["preview_poses_deg"].items():
-        transforms = frames(p, q)
+        transforms = canonicalize(frames(p, q))
         files["poses/" + name + ".json"] = json_text({
             "status": "visualization_only_not_clearance_certified", "joint_angles_deg": q,
             "world_from_frame": transforms,
